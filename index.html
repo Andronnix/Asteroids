@@ -2,14 +2,14 @@
 <HTML>
   <script src="processing.js"></script>
 
-  
+
   <style>
     body{
       background-color:black;
       color:white;
     }
     input{
-      background-color:#42B53E;   
+      background-color:#42B53E;
       color:#000;
       border-color:#42B53E;
       -webkit-border-radius: 5px;
@@ -19,12 +19,12 @@
     input:hover{
       border-color:#5DE858;
       color:#EBFF9C;
-    }    
+    }
     input:active{
-      background-color:#31872E;      
+      background-color:#31872E;
     }
     range{
-      -webkit-appearance: slider-vertical;    
+      -webkit-appearance: slider-vertical;
       width: 20px;
       heigth: 300px;
     }
@@ -36,10 +36,10 @@
       vertical-align:top;
     }
     .off{
-      background-color:#42B53E;  
+      background-color:#42B53E;
     }
     .on{
-      background-color:#E6252E;  
+      background-color:#E6252E;
     }
   </style>
   <body>
@@ -47,8 +47,17 @@
   <script>
   var sky;
   var asteroids;
-  var point = function(x, y) {this.x = x; this.y = y;}
   var MAXVELOCITY = 1;
+  
+  var point = function(x, y) {
+    this.x = x;
+    this.y = y;
+    this.isInsideRect = function(minX, minY, maxX, maxY) {
+      if (this.x < minX || this.x > maxX || this.y < minY || this.y > maxY) return false;
+      return true;
+    }
+    
+  }  
 
   var dt = 25;
   var pageSizeH = 550;
@@ -61,7 +70,7 @@
     this.stars = new Array();
     this.processing = processing;
     this.width = width;
-    this.height = height;    
+    this.height = height;
 
     var Star = function (x, y, blinkPeriod) {
       this.x = x;
@@ -89,7 +98,7 @@
     this.draw = function(processing) {
       var s, R;
 
-      for(var i = 0; i < this.N; i++) {     
+      for(var i = 0; i < this.N; i++) {
         s = this.stars[i];
         R = 3 * Math.sin(s.nextBlink / s.blinkPeriod * Math.PI * 2);
         processing.ellipse(s.x, s.y, R, R);
@@ -97,12 +106,12 @@
 
     }
 
-    this.update = function(processing) {      
-      for(var i = 0; i < this.N; i++) {     
+    this.update = function(processing) {
+      for(var i = 0; i < this.N; i++) {
         this.stars[i].nextBlink -= dt;
         if(this.stars[i].nextBlink <= 0){
           this.stars[i].nextBlink = this.stars[i].blinkPeriod;
-        } 
+        }
       }
       this.refillStars();
       this.draw(processing);
@@ -113,7 +122,7 @@
     var log100 = Math.log(100);
     for(var i = 0; i < this.N; i++) this.stars[i] = null;
     this.refillStars();
-    
+
   }
 
   var GenerateAst = function(processing, amount, minR, maxR) {
@@ -124,7 +133,7 @@
       this.x = x;
       this.y = y;
       this.dx = dx;
-      this.dy = dy;      
+      this.dy = dy;
       this.delta = maxR - minR;
       this.angleStep = Math.PI * 2 / edges;
       this.angle = 0;
@@ -135,32 +144,34 @@
         this.edges[i] = new point(tx, ty);
         this.angle += this.angleStep;
       }
-      
+
       this.move = function() {
         for (var j = 0; j < this.edges.length; j++) {
           this.edges[j].x += this.dx;
           this.edges[j].y += this.dy;
-        }      
+        }
       }
-      
+
       this.update = function(processing) {
         this.move();
-        processing.stroke("#FFFFFF");      
-        for (var j = 0; j < this.edges.length; j++) {
-          var k = (j + 1 == this.edges.length) ? 0 : j + 1;
+        processing.stroke("#FFFFFF");
+        for (var j = 0, k = this.edges.length - 1; j < this.edges.length; j++) {
           processing.line(this.edges[j].x, this.edges[j].y, this.edges[k].x, this.edges[k].y);
+          k = j;
         }
-      }      
+      }
+      
     }
     for (var i = 0; i < amount; i++) {
       asteroids[i] = new Asteroid(
         Math.random() * pageSizeW, Math.random() * pageSizeH,
         minR, maxR, this.edges,
-        Math.random() * MAXVELOCITY, Math.random() * MAXVELOCITY);
+        MAXVELOCITY - Math.random() * MAXVELOCITY * 2,
+        MAXVELOCITY - Math.random() * MAXVELOCITY * 2);
     }
   }
-  
-  function sketchProc(processing) {   
+
+  function sketchProc(processing) {
     processing.setup = function(){
       pageSizeW = window.innerWidth - 1;
       pageSizeH = window.innerHeight - 1;
@@ -176,7 +187,7 @@
       sky = new StarsSky(processing, pageSizeW, pageSizeH);
       GenerateAst(processing, 15, 5, 40);
     };
-    processing.draw = function(){      
+    processing.draw = function(){
       processing.background(0);
       sky.update(processing);
       for (var i = 0; i < asteroids.length; i++)asteroids[i].update(processing);
@@ -186,7 +197,7 @@
 
 // attaching the sketchProc function to the canvas
   var p = new Processing(canvas, sketchProc);
-  
+
   </script>
 
   </body>
