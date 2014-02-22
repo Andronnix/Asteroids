@@ -1,0 +1,147 @@
+<!doctype HTML>
+<HTML>
+  <script src="processing.js"></script>
+
+  
+  <style>
+    body{
+      background-color:black;
+      color:white;
+    }
+    input{
+      background-color:#42B53E;   
+      color:#000;
+      border-color:#42B53E;
+      -webkit-border-radius: 5px;
+      -moz-border-radius: 5px;
+      border-radius: 5px;
+    }
+    input:hover{
+      border-color:#5DE858;
+      color:#EBFF9C;
+    }    
+    input:active{
+      background-color:#31872E;      
+    }
+    range{
+      -webkit-appearance: slider-vertical;    
+      width: 20px;
+      heigth: 300px;
+    }
+    .control{
+      display:inline;
+      vertical-align:top;
+    }
+    .control input{
+      vertical-align:top;
+    }
+    .off{
+      background-color:#42B53E;  
+    }
+    .on{
+      background-color:#E6252E;  
+    }
+  </style>
+  <body>
+  <canvas id="holder"></canvas>
+  <script>
+  var sky;
+
+  var dt = 100;
+  var pageSizeH = 550;
+  var pageSizeW = 1200;
+
+  function d2h(a) {return a.toString(16);}
+
+  var StarsSky = function(processing, width, height) {
+    this.N = 100;
+    this.stars = new Array();
+    this.processing = processing;
+    this.width = width;
+    this.height = height;    
+
+    var Star = function (x, y, blinkPeriod) {
+      this.x = x;
+      this.y = y;
+      this.blinkPeriod = blinkPeriod;
+      this.nextBlink = blinkPeriod;
+    }
+
+    this.refillStars = function(){
+      var blinkPeriodMax = 10000;
+      var blinkPeriodMin = 1000;
+
+      for(var i = 0; i < this.N; i++) {
+        if(!this.stars[i]) {
+          this.stars[i] = new Star(
+            Math.random() * this.width,
+            Math.random() * this.height,
+            blinkPeriodMin + Math.random() * (blinkPeriodMax - blinkPeriodMin)
+          );
+        }
+      }
+
+    }
+
+    this.draw = function(processing) {
+      var s, R;
+
+      for(var i = 0; i < this.N; i++) {     
+        s = this.stars[i];
+        R = 3 * Math.sin(s.nextBlink / s.blinkPeriod * Math.PI * 2);
+        processing.ellipse(s.x, s.y, R, R);
+      }
+
+    }
+
+    this.update = function(processing) {      
+      for(var i = 0; i < this.N; i++) {     
+        this.stars[i].nextBlink -= dt;
+        if(this.stars[i].nextBlink <= 0){
+          this.stars[i].nextBlink = this.stars[i].blinkPeriod;
+        } 
+      }
+      this.refillStars();
+      this.draw(processing);
+    }
+
+    /*Constructor code */
+
+    var log100 = Math.log(100);
+    for(var i = 0; i < this.N; i++) this.stars[i] = null;
+    this.refillStars();
+    
+  }
+
+
+  
+  function sketchProc(processing) {   
+    processing.setup = function(){
+      pageSizeW = window.innerWidth - 1;
+      pageSizeH = window.innerHeight - 1;
+      canvas.style.position = "absolute";
+      canvas.style.top = canvas.style.left = 0;
+      processing.size(pageSizeW, pageSizeH);
+      processing.strokeWeight(1);
+      processing.frameRate(1000 / dt);
+
+      processing.background(0);
+      processing.stroke("#FFFFFF");
+
+      sky = new StarsSky(processing, pageSizeW, pageSizeH);
+    };
+    processing.draw = function(){      
+      processing.background(0);
+      sky.update(processing);
+    }
+  }
+  var canvas = document.getElementById("holder");
+
+// attaching the sketchProc function to the canvas
+  var p = new Processing(canvas, sketchProc);
+  
+  </script>
+
+  </body>
+</HTML>
+
