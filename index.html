@@ -46,8 +46,11 @@
   <canvas id="holder"></canvas>
   <script>
   var sky;
+  var asteroids;
+  var point = function(x, y) {this.x = x; this.y = y;}
+  var MAXVELOCITY = 1;
 
-  var dt = 100;
+  var dt = 25;
   var pageSizeH = 550;
   var pageSizeW = 1200;
 
@@ -113,7 +116,49 @@
     
   }
 
-
+  var GenerateAst = function(processing, amount, minR, maxR) {
+    asteroids = new Array();
+    this.edges = 7; // later will change them... or not :)
+    var Asteroid = function(x, y, minR, maxR, edges, dx, dy) {
+      this.edges = new Array(); //point() array
+      this.x = x;
+      this.y = y;
+      this.dx = dx;
+      this.dy = dy;      
+      this.delta = maxR - minR;
+      this.angleStep = Math.PI * 2 / edges;
+      this.angle = 0;
+      for (var i = 0; i < edges; i++) {
+        var bone = minR + Math.random() * this.delta;
+        var tx = this.x + bone * Math.cos(this.angle);
+        var ty = this.y + bone * Math.sin(this.angle);
+        this.edges[i] = new point(tx, ty);
+        this.angle += this.angleStep;
+      }
+      
+      this.move = function() {
+        for (var j = 0; j < this.edges.length; j++) {
+          this.edges[j].x += this.dx;
+          this.edges[j].y += this.dy;
+        }      
+      }
+      
+      this.update = function(processing) {
+        this.move();
+        processing.stroke("#FFFFFF");      
+        for (var j = 0; j < this.edges.length; j++) {
+          var k = (j + 1 == this.edges.length) ? 0 : j + 1;
+          processing.line(this.edges[j].x, this.edges[j].y, this.edges[k].x, this.edges[k].y);
+        }
+      }      
+    }
+    for (var i = 0; i < amount; i++) {
+      asteroids[i] = new Asteroid(
+        Math.random() * pageSizeW, Math.random() * pageSizeH,
+        minR, maxR, this.edges,
+        Math.random() * MAXVELOCITY, Math.random() * MAXVELOCITY);
+    }
+  }
   
   function sketchProc(processing) {   
     processing.setup = function(){
@@ -129,10 +174,12 @@
       processing.stroke("#FFFFFF");
 
       sky = new StarsSky(processing, pageSizeW, pageSizeH);
+      GenerateAst(processing, 15, 5, 40);
     };
     processing.draw = function(){      
       processing.background(0);
       sky.update(processing);
+      for (var i = 0; i < asteroids.length; i++)asteroids[i].update(processing);
     }
   }
   var canvas = document.getElementById("holder");
