@@ -48,7 +48,7 @@
   var sky, ship;
   var keyListener, timer;
 
-  var dt = 50;
+  var dt = 25;
   var pageSizeH = 550;
   var pageSizeW = 1200;
 
@@ -114,6 +114,45 @@
     
   }
 
+  var Bullet = function(x, y, callback) {
+    this.x = x;
+    this.y = y;
+    this.R = 3;
+    this.speed = [0, 0];
+    this.lifeTime = 1000;
+    this.prevTime = 0;
+    this.callback = callback;
+
+    var self = this;
+
+    this.MOVEhandler = function(){
+      self.x += self.speed[0];
+      self.y += self.speed[1];
+      
+      var t = Date.now();
+      var delta = t - self.prevTime;
+      console.log(self.lifeTime);
+
+      self.lifeTime -= delta;
+
+      if(self.lifeTime < 0) { /*SMTH strange with that! */
+        timer.removeHandler(self.MOVEhandler, 0);
+        self.callback(self);        
+      }
+    }
+
+    this.launch = function(speed, lifeTime){
+      self.speed = speed;
+      self.lifeTime = lifeTime;      
+      self.prevTime = Date.now();
+      timer.addHandler(self.MOVEhandler);
+    }
+
+    this.draw = function(processing) {
+      processing.ellipse(self.x, self.y, self.R, self.R);
+    }
+  }
+
   var Ship = function(x, y) {
     this.x = x;
     this.y = y;
@@ -122,6 +161,7 @@
     this.acceleration = 0.3;
     this.rotation = 0;
     this.rotationSpeed = Math.PI / 36;
+    this.bullets = [];
 
 
     /* polar coordinate system, radius from center and angle anticlockwise [r, alpha] */
@@ -138,22 +178,33 @@
       return s;
     }
 
-    this.UPhandler    = function(){
-      console.log(self);
+    this.UPhandler    = function() {
       self.speed[0] += self.acceleration * Math.cos(self.rotation);
       self.speed[1] += self.acceleration * Math.sin(self.rotation);
 
       self.speed = normalizeSpeed(self.speed, self.maxSpeed);
     };
-    this.DOWNhandler  = function(){ 
+    this.DOWNhandler  = function() { 
       self.speed[0] -= self.acceleration * Math.cos(self.rotation);
       self.speed[1] -= self.acceleration * Math.sin(self.rotation);
 
       self.speed = normalizeSpeed(self.speed, self.maxSpeed);
     };
-    this.LEFThandler  = function(){ self.rotation -= self.rotationSpeed;};
-    this.RIGHThandler = function(){ self.rotation += self.rotationSpeed;};
-    this.SPACEhandler = function(){ console.log("SHOOT");};
+    this.LEFThandler  = function() { self.rotation -= self.rotationSpeed;};
+    this.RIGHThandler = function() { self.rotation += self.rotationSpeed;};
+    this.SPACEhandler = function() {
+      function callback(b) {
+        var index = self.bullets.indexOf(b);
+        if(index >= 0)
+          self.bullets.splice(index, 1);
+      } 
+      var b = new Bullet(self.x, self.y, callback); 
+
+      var speed = 10;
+
+      self.bullets.push(b);
+      b.launch([speed * Math.cos(self.rotation), speed * Math.sin(self.rotation)], 30000);
+    };
     this.MOVEhandler = function(){ 
       self.x += self.speed[0]; 
       self.y += self.speed[1];
@@ -177,6 +228,8 @@
                       p3[0] + self.x, p3[1] + self.y,
                       p4[0] + self.x, p4[1] + self.y
       );
+      for(var i = 0; i < self.bullets.length; i++)
+        self.bullets[i].draw(processing);
     }
 
     this.ControlsDown = function(key){
@@ -306,22 +359,29 @@
 
 
     this.addHandler = function(handler, dt, params) {
+      if(handler == undefined) return;
       dt = dt | (this.dt / 2);
       params = params | [];
       /* handler function, delta, currentDelta */
       this.handlers.push([handler, dt, dt, params]);
-      console.log(this.handlers, [handler, dt, dt, params]);
       return handler;
     }
-    this.removeHandler = function(handler) {
-      for(var i = 0; i < this.handlers.length; i++){
-        if(this.handlers[i][0] == handler){
-          this.handlers.splice(i, 1);
-          i--;
-          continue;
+
+    this.removeHandler = function(handler) {      
+      var l;
+      while(true){
+        l = this.handlers.length;
+        for(var i = 0; i < this.handlers.length; i++){
+          if(this.handlers[i][0] == handler){
+            this.handlers.splice(i, 1);
+            i--;
+            break;
+          }
         }
+        if(i == l) break;
       }
     }
+
     this.notifyHandlers = function(){
       var t = Date.now();
       var delta = t - self.oldTime;
@@ -330,8 +390,8 @@
       for(var i = 0; i < h.length; i++) {
         h[i][2] -= delta;
         if(h[i][2] < 0) {
-          h[i][0].call(window, h[i][3]);
           h[i][2] = h[i][1]; // reset time;
+          h[i][0].call(window, h[i][3]); // WARNING: this must be last use of h[i] in loop
         }
       }
       setTimeout(self.notifyHandlers, self.dt);
