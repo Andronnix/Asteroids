@@ -57,6 +57,15 @@
       return true;
     }
     
+    this.isInsidePoly = function(polyArr) {
+      var hit = false;
+      for (var i = 0, j = polyArr.length - 1; i < polyArr.length; i++) {
+        if ((((polyArr[i].y <= this.y) && (this.y < polyArr[j].y)) || ((polyArr[j].y <= this.y) && (this.y < polyArr[i].y))) && (this.x < (polyArr[j].x - polyArr[i].x) * (this.y - polyArr[i].y) / (polyArr[j].y - polyArr[i].y) + polyArr[i].x))
+            hit = !hit;     
+        j = i;
+      }
+      return hit;
+    }
   }  
 
   var dt = 25;
@@ -149,6 +158,21 @@
         for (var j = 0; j < this.edges.length; j++) {
           this.edges[j].x += this.dx;
           this.edges[j].y += this.dy;
+          //hittest
+          /* TRY THIS FOR FREAKIN' DISCO xDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD
+          no, really try!
+          for (var k = 0; k < asteroids.length; k++){
+            if (this.edges[j].isInsidePoly(asteroids[k].edges)) {
+              this.dx *= -1;
+              this.dy *= -1;
+            }
+          }*/
+          for (var k = 0; k < asteroids.length; k++){
+            if (this.x != asteroids[k].x && this.y != asteroids[k].y && this.edges[j].isInsidePoly(asteroids[k].edges)) {
+              this.dx *= -1;
+              this.dy *= -1;
+            }
+          }          
         }
       }
 
