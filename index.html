@@ -1,9 +1,8 @@
 <!doctype HTML>
 <HTML>
-  <script src="processing.js"></script>
-
-  
-  <style>
+  <head>
+    <script src="processing.js"></script>  
+    <style>
     body{
       background-color:black;
       color:white;
@@ -41,13 +40,15 @@
     .on{
       background-color:#E6252E;  
     }
-  </style>
+    </style>
+  </head>
   <body>
   <canvas id="holder"></canvas>
   <script>
-  var sky;
+  var sky, ship;
+  var keyListener, timer;
 
-  var dt = 100;
+  var dt = 50;
   var pageSizeH = 550;
   var pageSizeW = 1200;
 
@@ -113,10 +114,238 @@
     
   }
 
+  var Ship = function(x, y) {
+    this.x = x;
+    this.y = y;
+    this.speed = [0, 0];
+    this.maxSpeed = 10;
+    this.acceleration = 0.3;
+    this.rotation = 0;
+    this.rotationSpeed = Math.PI / 36;
 
+
+    /* polar coordinate system, radius from center and angle anticlockwise [r, alpha] */
+    this.shape = [ [15, Math.PI / 2], [15, 7/6 * Math.PI], [0, 3/2 * Math.PI], [15, 11/6 * Math.PI] ];
+    this.center = [0, 0];
+    var self = this;
+
+    function normalizeSpeed(s, maxVal) {
+      var s2 = Math.pow(s[0], 2) + Math.pow(s[1], 2);
+      var m2 = Math.pow(maxVal, 2);
+      if(s2 <= m2) return s;
+      s2 = Math.sqrt(s2);
+      s[0] = s[0] / s2 * maxVal; s[1] = s[1] / s2 * maxVal;
+      return s;
+    }
+
+    this.UPhandler    = function(){
+      console.log(self);
+      self.speed[0] += self.acceleration * Math.cos(self.rotation);
+      self.speed[1] += self.acceleration * Math.sin(self.rotation);
+
+      self.speed = normalizeSpeed(self.speed, self.maxSpeed);
+    };
+    this.DOWNhandler  = function(){ 
+      self.speed[0] -= self.acceleration * Math.cos(self.rotation);
+      self.speed[1] -= self.acceleration * Math.sin(self.rotation);
+
+      self.speed = normalizeSpeed(self.speed, self.maxSpeed);
+    };
+    this.LEFThandler  = function(){ self.rotation -= self.rotationSpeed;};
+    this.RIGHThandler = function(){ self.rotation += self.rotationSpeed;};
+    this.SPACEhandler = function(){ console.log("SHOOT");};
+    this.MOVEhandler = function(){ 
+      self.x += self.speed[0]; 
+      self.y += self.speed[1];
+    }
+
+    function polar2cartesian(r, phi) {
+      return [r * Math.cos(phi), r * Math.sin(phi)];
+    }
+
+    this.draw = function(processing) {
+      var s = this.shape;
+      var r = this.rotation - Math.PI / 2;
+      processing.stroke("#CCCCCC");
+      var p1 = polar2cartesian(s[0][0], s[0][1] + r);
+      var p2 = polar2cartesian(s[1][0], s[1][1] + r);
+      var p3 = polar2cartesian(s[2][0], s[2][1] + r);
+      var p4 = polar2cartesian(s[3][0], s[3][1] + r);
+
+      processing.quad(p1[0] + self.x, p1[1] + self.y,
+                      p2[0] + self.x, p2[1] + self.y,
+                      p3[0] + self.x, p3[1] + self.y,
+                      p4[0] + self.x, p4[1] + self.y
+      );
+    }
+
+    this.ControlsDown = function(key){
+      switch(key){
+        case 32: timer.addHandler(self.SPACEhandler); break;
+        case 38: timer.addHandler(self.UPhandler); break;
+        case 40: timer.addHandler(self.DOWNhandler); break;
+        case 37: timer.addHandler(self.LEFThandler); break;
+        case 39: timer.addHandler(self.RIGHThandler); break;
+      }
+    }
+    this.ControlsUp = function(key){
+      switch(key){
+        case 32: timer.removeHandler(self.SPACEhandler); break;
+        case 38: timer.removeHandler(self.UPhandler); break;
+        case 40: timer.removeHandler(self.DOWNhandler); break;
+        case 37: timer.removeHandler(self.LEFThandler); break;
+        case 39: timer.removeHandler(self.RIGHThandler); break;
+      }
+    }
+
+    keyListener.addKeyDownListener(this.ControlsDown, [32, 37, 38, 39, 40]);
+    keyListener.addKeyUpListener(this.ControlsUp, [32, 37, 38, 39, 40]);
+    timer.addHandler(this.MOVEhandler, 20);
+
+  }
   
+  var KeyListener = function(holder) {
+    this.holder = holder;
+    this.keyDownListeners = [];
+    this.keyUpListeners = [];
+    this.keys = [];
+    var self = this;
+
+    function findListener(array, handler) {
+      for(var i = 0; i < array.length; i++){
+        if(array[i][0] == handler)
+          return i;
+      }
+      return -1;
+    }
+
+    this.addKeyDownListener = function(handler, key) {
+      if(handler == undefined) {
+        console.log("bad handler");
+        return;
+      }
+      if((typeof key == "object") && (key instanceof Array)){
+        for(var i = 0; i < key.length; i++)
+          this.keyDownListeners.push([handler, key[i]]);
+      } else {
+        this.keyDownListeners.push([handler, key]);
+      }
+    }
+    this.removeKeyDownListener = function(handler) {
+      var index = findListener(this.keyDownListeners, handler);
+      if(index >= 0) {
+        this.keyDownListeners.slice(index, 1);
+      }
+    }
+    this.addKeyUpListener = function(handler, key) {
+      if(handler == undefined) {
+        console.log("bad handler");
+        return;
+      }
+      if((typeof key == "object") && (key instanceof Array)){
+        for(var i = 0; i < key.length; i++)
+          this.keyUpListeners.push([handler, key[i]]);
+      } else {
+        this.keyUpListeners.push([handler, key]);
+      }      
+    }
+    this.removeKeyUpListener = function(handler) {
+      var index = findListener(this.keyUpListeners, handler);    
+      if(index >= 0) {
+        this.keyUpListeners.slice(index, 1);
+      }
+    } 
+
+    function getKeyCode(event) {
+      if (event.which == null) {  // IE
+        if (event.keyCode < 32) return 0; // спец. символ
+        return event.keyCode;
+      }
+     
+      if (event.which != 0 && event.charCode != 0) { // все кроме IE
+        if (event.which < 32) return 0; // спец. символ
+        return event.which; // остальные
+      }
+     
+        return 0; // спец. символ
+    }
+
+    this.notifyListeners = function(listeners, key) {
+      for(var  i = 0, l = listeners.length; i < l; i++){        
+        if(listeners[i][1] == key) {
+          listeners[i][0].call(window, key);
+        }
+      }
+    }
+
+    this.holder.onkeydown = function(e) {
+      var c = e.keyCode;
+      if(self.keys.indexOf(c) < 0) {
+        self.notifyListeners(self.keyDownListeners, c);
+        self.keys.push(c);
+      }
+    }
+    this.holder.onkeyup = function(e) {
+      var c = e.keyCode;
+      var index = self.keys.indexOf(c);
+      if(index >= 0) {
+        self.notifyListeners(self.keyUpListeners, c);
+        self.keys.splice(index, 1);
+        //console.log(self.keys, c, index);
+      }else{
+        console.log("WTF?!");
+      }
+    }
+  }
+
+  var Timer = function(dt) {    
+    this.handlers = [];
+    this.dt = dt;
+    this.oldTime;
+    var self = this;
+
+
+    this.addHandler = function(handler, dt, params) {
+      dt = dt | (this.dt / 2);
+      params = params | [];
+      /* handler function, delta, currentDelta */
+      this.handlers.push([handler, dt, dt, params]);
+      console.log(this.handlers, [handler, dt, dt, params]);
+      return handler;
+    }
+    this.removeHandler = function(handler) {
+      for(var i = 0; i < this.handlers.length; i++){
+        if(this.handlers[i][0] == handler){
+          this.handlers.splice(i, 1);
+          i--;
+          continue;
+        }
+      }
+    }
+    this.notifyHandlers = function(){
+      var t = Date.now();
+      var delta = t - self.oldTime;
+      self.oldTime = t;
+      var h = self.handlers;      
+      for(var i = 0; i < h.length; i++) {
+        h[i][2] -= delta;
+        if(h[i][2] < 0) {
+          h[i][0].call(window, h[i][3]);
+          h[i][2] = h[i][1]; // reset time;
+        }
+      }
+      setTimeout(self.notifyHandlers, self.dt);
+    }
+    this.oldTime = Date.now();
+    setTimeout(self.notifyHandlers, self.dt);
+  }
+
+  function init() {
+
+  }
+
   function sketchProc(processing) {   
-    processing.setup = function(){
+    processing.setup = function() {
       pageSizeW = window.innerWidth - 1;
       pageSizeH = window.innerHeight - 1;
       canvas.style.position = "absolute";
@@ -129,13 +358,19 @@
       processing.stroke("#FFFFFF");
 
       sky = new StarsSky(processing, pageSizeW, pageSizeH);
+      ship = new Ship(100, 100);
+
     };
-    processing.draw = function(){      
+    processing.draw = function() {      
       processing.background(0);
       sky.update(processing);
+      ship.draw(processing);
     }
   }
   var canvas = document.getElementById("holder");
+  keyListener = new KeyListener(canvas);
+  timer = new Timer(dt / 2);
+
 
 // attaching the sketchProc function to the canvas
   var p = new Processing(canvas, sketchProc);
