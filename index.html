@@ -1,8 +1,6 @@
 <!doctype HTML>
 <HTML>
   <script src="processing.js"></script>
-
-
   <style>
     body{
       background-color:black;
@@ -49,7 +47,14 @@
   var asteroids;
   var MAXVELOCITY = 1;
   
-  var point = function(x, y) {
+
+  var dt = 25;
+  var pageSizeH = 550;
+  var pageSizeW = 1200;
+
+  function d2h(a) {return a.toString(16);}
+
+  var Point = function(x, y) {
     this.x = x;
     this.y = y;
     this.isInsideRect = function(minX, minY, maxX, maxY) {
@@ -67,12 +72,6 @@
       return hit;
     }
   }  
-
-  var dt = 25;
-  var pageSizeH = 550;
-  var pageSizeW = 1200;
-
-  function d2h(a) {return a.toString(16);}
 
   var StarsSky = function(processing, width, height) {
     this.N = 100;
@@ -133,76 +132,79 @@
     this.refillStars();
 
   }
+  
+  var Asteroid = function(x, y, minR, maxR, edges, dx, dy) {
+    this.edges = new Array(); //Point() array
+    this.x = x;
+    this.y = y;
+    this.dx = dx;
+    this.dy = dy;
+    var self = this;
 
-  var GenerateAst = function(processing, amount, minR, maxR) {
-    asteroids = new Array();
-    this.edges = 7; // later will change them... or not :)
-    var Asteroid = function(x, y, minR, maxR, edges, dx, dy) {
-      this.edges = new Array(); //point() array
-      this.x = x;
-      this.y = y;
-      this.dx = dx;
-      this.dy = dy;
-      var delta = maxR - minR;
-      var angleStep = Math.PI * 2 / edges;
-      var angle = 0;
-      for (var i = 0; i < edges; i++) {
-        var bone = minR + Math.random() * this.delta;
-        var tx = this.x + bone * Math.cos(this.angle);
-        var ty = this.y + bone * Math.sin(this.angle);
-        this.edges[i] = new point(tx, ty);
-        this.angle += this.angleStep;
-      }
-      
-      // this will move Asteroid to the specified point with the same acceleration 
-      this.relocate = function(newX, newY) {
-        var oldDx = this.dx;
-        var oldDy = this.dy;
-        this.dx = newX - this.x;
-        this.dy = newy - this.y;
-        this.move();
-        this.dx = oldDx;
-        this.dy = oldDy;        
-      }
-      
-      this.move = function() {
-        for (var j = 0; j < this.edges.length; j++) {
-          this.edges[j].x += this.dx;
-          this.edges[j].y += this.dy;
-          //hittest
-          /* TRY THIS FOR FREAKIN' DISCO xDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD
-          no, really try!
-          for (var k = 0; k < asteroids.length; k++){
-            if (this.edges[j].isInsidePoly(asteroids[k].edges)) {
-              this.dx *= -1;
-              this.dy *= -1;
-            }
-          }*/
-          /**/for (var k = 0; k < asteroids.length; k++){
-            if (this.x != asteroids[k].x && this.y != asteroids[k].y && this.edges[j].isInsidePoly(asteroids[k].edges)) {
-              this.dx *= -1;
-              this.dy *= -1;
-            }
-          }//*/          
-        }
-      }
+    var delta = maxR - minR;
+    var angleStep = Math.PI * 2 / edges;
+    var angle = 0;
 
-      this.update = function(processing) {
-        this.move();
-        processing.stroke("#FFFFFF");
-        for (var j = 0, k = this.edges.length - 1; j < this.edges.length; j++) {
-          processing.line(this.edges[j].x, this.edges[j].y, this.edges[k].x, this.edges[k].y);
-          k = j;
-        }
-      }
-      this.clone = function() {
-        var cl = new Asteroid(this.x, this.y);
+    for (var i = 0; i < edges; i++) {
+      var bone = minR + Math.random() * delta;
+      var tx = this.x + bone * Math.cos(angle);
+      var ty = this.y + bone * Math.sin(angle);
+      this.edges[i] = new Point(tx, ty);
+      angle += angleStep;
+    }
+    
+    // this will move Asteroid to the specified Point with the same acceleration 
+    this.relocate = function(newX, newY) {
+      var oldDx = this.dx;
+      var oldDy = this.dy;
+      this.dx = newX - this.x;
+      this.dy = newy - this.y;
+      this.move();
+      this.dx = oldDx;
+      this.dy = oldDy;        
+    }
+    
+    this.move = function() {
+      for (var j = 0; j < self.edges.length; j++) {
+        self.edges[j].x += self.dx;
+        self.edges[j].y += self.dy; 
       }
     }
+
+    this.update = function() {
+      self.move();
+    }
+
+    this.draw = function(processing){      
+      self.update();
+      processing.stroke("#FFFFFF");
+      for (var j = 0, k = self.edges.length - 1; j < self.edges.length; j++) {
+        processing.line(self.edges[j].x, self.edges[j].y, self.edges[k].x, self.edges[k].y);
+        k = j;
+      }
+    }
+    
+    this.hitTest = function(point) {
+      var hit = false;
+      var polyArr = self.edges;
+      for (var i = 0, j = polyArr.length - 1; i < polyArr.length; i++) {
+        if ((((polyArr[i].y <= point.y) && (point.y < polyArr[j].y)) || ((polyArr[j].y <= point.y) && (point.y < polyArr[i].y))) && (point.x < (polyArr[j].x - polyArr[i].x) * (point.y - polyArr[i].y) / (polyArr[j].y - polyArr[i].y) + polyArr[i].x))
+            hit = !hit;     
+        j = i;
+      }
+      return hit;
+    }
+
+  }
+
+  var generateAst = function(processing, amount, minR, maxR) {
+    asteroids = new Array();
+    var edges = 7; // later will change them... or not :)
+
     for (var i = 0; i < amount; i++) {
       asteroids[i] = new Asteroid(
         Math.random() * pageSizeW, Math.random() * pageSizeH,
-        minR, maxR, this.edges,
+        minR, maxR, edges,
         MAXVELOCITY - Math.random() * MAXVELOCITY * 2,
         MAXVELOCITY - Math.random() * MAXVELOCITY * 2);
     }
@@ -222,12 +224,14 @@
       processing.stroke("#FFFFFF");
 
       sky = new StarsSky(processing, pageSizeW, pageSizeH);
-      GenerateAst(processing, 15, 5, 40);
+      generateAst(processing, 15, 5, 40);
     };
     processing.draw = function(){
       processing.background(0);
       sky.update(processing);
-      for (var i = 0; i < asteroids.length; i++)asteroids[i].update(processing);
+      for (var i = 0; i < asteroids.length; i++){
+        asteroids[i].draw(processing);
+      }
     }
   }
   var canvas = document.getElementById("holder");
