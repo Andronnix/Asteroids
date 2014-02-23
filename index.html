@@ -3,43 +3,44 @@
   <head>
     <script src="processing.js"></script>  
     <style>
-    body{
-      background-color:black;
-      color:white;
-    }
-    input{
-      background-color:#42B53E;   
-      color:#000;
-      border-color:#42B53E;
-      -webkit-border-radius: 5px;
-      -moz-border-radius: 5px;
-      border-radius: 5px;
-    }
-    input:hover{
-      border-color:#5DE858;
-      color:#EBFF9C;
-    }    
-    input:active{
-      background-color:#31872E;      
-    }
-    range{
-      -webkit-appearance: slider-vertical;    
-      width: 20px;
-      heigth: 300px;
-    }
-    .control{
-      display:inline;
-      vertical-align:top;
-    }
-    .control input{
-      vertical-align:top;
-    }
-    .off{
-      background-color:#42B53E;  
-    }
-    .on{
-      background-color:#E6252E;  
-    }
+
+      body{
+        background-color:black;
+        color:white;
+      }
+      input{
+        background-color:#42B53E;   
+        color:#000;
+        border-color:#42B53E;
+        -webkit-border-radius: 5px;
+        -moz-border-radius: 5px;
+        border-radius: 5px;
+      }
+      input:hover{
+        border-color:#5DE858;
+        color:#EBFF9C;
+      }    
+      input:active{
+        background-color:#31872E;      
+      }
+      range{
+        -webkit-appearance: slider-vertical;    
+        width: 20px;
+        heigth: 300px;
+      }
+      .control{
+        display:inline;
+        vertical-align:top;
+      }
+      .control input{
+        vertical-align:top;
+      }
+      .off{
+        background-color:#42B53E;  
+      }
+      .on{
+        background-color:#E6252E;  
+      }
     </style>
   </head>
   <body>
@@ -48,7 +49,7 @@
   var sky, ship;
   var keyListener, timer;
 
-  var dt = 25;
+  var dt = 30;
   var pageSizeH = 550;
   var pageSizeW = 1200;
 
@@ -125,13 +126,9 @@
 
     var self = this;
 
-    this.MOVEhandler = function(){
+    this.MOVEhandler = function(delta){
       self.x += self.speed[0];
-      self.y += self.speed[1];
-      
-      var t = Date.now();
-      var delta = t - self.prevTime;
-      console.log(self.lifeTime);
+      self.y += self.speed[1];    
 
       self.lifeTime -= delta;
 
@@ -162,6 +159,8 @@
     this.rotation = 0;
     this.rotationSpeed = Math.PI / 36;
     this.bullets = [];
+    this.gunDelay = 250; // 0.25 seconds
+    this.gunCurrentDelay = 0;
 
 
     /* polar coordinate system, radius from center and angle anticlockwise [r, alpha] */
@@ -192,19 +191,41 @@
     };
     this.LEFThandler  = function() { self.rotation -= self.rotationSpeed;};
     this.RIGHThandler = function() { self.rotation += self.rotationSpeed;};
-    this.SPACEhandler = function() {
+
+
+    this.fire = function() {
+      var h; 
+      function resetGun(delta) {
+        self.gunCurrentDelay -= delta;
+        if(self.gunCurrentDelay <= 0) {
+          self.gunCurrentDelay = 0;
+          timer.removeHandler(h);
+        }
+      };
+
       function callback(b) {
         var index = self.bullets.indexOf(b);
         if(index >= 0)
           self.bullets.splice(index, 1);
-      } 
-      var b = new Bullet(self.x, self.y, callback); 
+      };
 
-      var speed = 10;
+      if(self.gunCurrentDelay == 0) {
+        var b = new Bullet(self.x, self.y, callback); 
+        var speed = 10;
 
-      self.bullets.push(b);
-      b.launch([speed * Math.cos(self.rotation), speed * Math.sin(self.rotation)], 30000);
+        self.bullets.push(b);
+        var lifeTime = 5000; // 5 seconds
+        b.launch([speed * Math.cos(self.rotation), speed * Math.sin(self.rotation)], lifeTime);
+        
+        self.gunCurrentDelay = self.gunDelay;
+        h = timer.addHandler(resetGun);
+      }
+    }
+
+    this.SPACEhandler = function() {
+      self.fire();
     };
+
     this.MOVEhandler = function(){ 
       self.x += self.speed[0]; 
       self.y += self.speed[1];
@@ -337,7 +358,7 @@
         self.notifyListeners(self.keyDownListeners, c);
         self.keys.push(c);
       }
-    }
+    }        
     this.holder.onkeyup = function(e) {
       var c = e.keyCode;
       var index = self.keys.indexOf(c);
@@ -349,7 +370,15 @@
         console.log("WTF?!");
       }
     }
+
+    function visibilityChanged() {
+      for(var i = 0; i < self.keys.length; i++)
+        notifyListeners(self.keyUpListeners, self.keys[i]);
+      self.keys.length = 0; // remove anything from keys
+    }
+    document.addEventListener("visibilitychange", visibilityChanged);
   }
+
 
   var Timer = function(dt) {    
     this.handlers = [];
@@ -375,7 +404,6 @@
           if(this.handlers[i][0] == handler){
             this.handlers.splice(i, 1);
             i--;
-            break;
           }
         }
         if(i == l) break;
@@ -384,14 +412,14 @@
 
     this.notifyHandlers = function(){
       var t = Date.now();
-      var delta = t - self.oldTime;
+      var delta = t - self.oldTime;      
       self.oldTime = t;
       var h = self.handlers;      
       for(var i = 0; i < h.length; i++) {
         h[i][2] -= delta;
         if(h[i][2] < 0) {
           h[i][2] = h[i][1]; // reset time;
-          h[i][0].call(window, h[i][3]); // WARNING: this must be last use of h[i] in loop
+          h[i][0].call(window, delta, h[i][3]); // WARNING: this must be last use of h[i] in loop
         }
       }
       setTimeout(self.notifyHandlers, self.dt);
@@ -429,7 +457,7 @@
   }
   var canvas = document.getElementById("holder");
   keyListener = new KeyListener(canvas);
-  timer = new Timer(dt / 2);
+  timer = new Timer(dt);
 
 
 // attaching the sketchProc function to the canvas
