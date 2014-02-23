@@ -179,11 +179,14 @@
 
     this.draw = function(processing){      
       self.update();
-      processing.stroke("#FFFFFF");
-      for (var j = 0, k = self.edges.length - 1; j < self.edges.length; j++) {
-        processing.line(self.edges[j].x, self.edges[j].y, self.edges[k].x, self.edges[k].y);
-        k = j;
+      processing.noFill();
+      processing.beginShape();
+      for (var j = 0; j < self.edges.length; j++) {
+        processing.vertex(self.edges[j].x, self.edges[j].y);
       }
+      processing.vertex(self.edges[0].x, self.edges[0].y);
+      processing.endShape();
+      processing.fill("#FFFFFF");
     }
     
     this.hitTest = function(point) {
@@ -538,11 +541,12 @@
       processing.frameRate(1000 / dt);
 
       processing.background(0);
-      processing.stroke("#FFFFFF");
+      processing.stroke("#FFFFFF");      
 
       sky = new StarsSky(processing, pageSizeW, pageSizeH);
       ship = new Ship(100, 100);
       generateAst(processing, 15, 5, 40);
+
 
     };
 
