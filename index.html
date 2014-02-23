@@ -3,7 +3,6 @@
   <head>
     <script src="processing.js"></script>  
     <style>
-
       body{
         background-color:black;
         color:white;
@@ -47,6 +46,8 @@
   <canvas id="holder"></canvas>
   <script>
   var sky, ship;
+  var asteroids;
+
   var keyListener, timer;
 
   var dt = 30;
@@ -55,12 +56,31 @@
 
   function d2h(a) {return a.toString(16);}
 
+  var Point = function(x, y) {
+    this.x = x;
+    this.y = y;
+    this.isInsideRect = function(minX, minY, maxX, maxY) {
+      if (this.x < minX || this.x > maxX || this.y < minY || this.y > maxY) return false;
+      return true;
+    }
+    
+    this.isInsidePoly = function(polyArr) {
+      var hit = false;
+      for (var i = 0, j = polyArr.length - 1; i < polyArr.length; i++) {
+        if ((((polyArr[i].y <= this.y) && (this.y < polyArr[j].y)) || ((polyArr[j].y <= this.y) && (this.y < polyArr[i].y))) && (this.x < (polyArr[j].x - polyArr[i].x) * (this.y - polyArr[i].y) / (polyArr[j].y - polyArr[i].y) + polyArr[i].x))
+            hit = !hit;     
+        j = i;
+      }
+      return hit;
+    }
+  }  
+
   var StarsSky = function(processing, width, height) {
     this.N = 100;
     this.stars = new Array();
     this.processing = processing;
     this.width = width;
-    this.height = height;    
+    this.height = height;
 
     var Star = function (x, y, blinkPeriod) {
       this.x = x;
@@ -88,7 +108,7 @@
     this.draw = function(processing) {
       var s, R;
 
-      for(var i = 0; i < this.N; i++) {     
+      for(var i = 0; i < this.N; i++) {
         s = this.stars[i];
         R = 3 * Math.sin(s.nextBlink / s.blinkPeriod * Math.PI * 2);
         processing.ellipse(s.x, s.y, R, R);
@@ -96,12 +116,12 @@
 
     }
 
-    this.update = function(processing) {      
-      for(var i = 0; i < this.N; i++) {     
+    this.update = function(processing) {
+      for(var i = 0; i < this.N; i++) {
         this.stars[i].nextBlink -= dt;
         if(this.stars[i].nextBlink <= 0){
           this.stars[i].nextBlink = this.stars[i].blinkPeriod;
-        } 
+        }
       }
       this.refillStars();
       this.draw(processing);
@@ -112,7 +132,71 @@
     var log100 = Math.log(100);
     for(var i = 0; i < this.N; i++) this.stars[i] = null;
     this.refillStars();
+
+  }
+  
+  var Asteroid = function(x, y, minR, maxR, edges, dx, dy) {
+    this.edges = new Array(); //Point() array
+    this.x = x;
+    this.y = y;
+    this.dx = dx;
+    this.dy = dy;
+    var self = this;
+
+    var delta = maxR - minR;
+    var angleStep = Math.PI * 2 / edges;
+    var angle = 0;
+
+    for (var i = 0; i < edges; i++) {
+      var bone = minR + Math.random() * delta;
+      var tx = this.x + bone * Math.cos(angle);
+      var ty = this.y + bone * Math.sin(angle);
+      this.edges[i] = new Point(tx, ty);
+      angle += angleStep;
+    }
     
+    // this will move Asteroid to the specified Point with the same acceleration 
+    this.relocate = function(newX, newY) {
+      var oldDx = this.dx;
+      var oldDy = this.dy;
+      this.dx = newX - this.x;
+      this.dy = newy - this.y;
+      this.move();
+      this.dx = oldDx;
+      this.dy = oldDy;        
+    }
+    
+    this.move = function() {
+      for (var j = 0; j < self.edges.length; j++) {
+        self.edges[j].x += self.dx;
+        self.edges[j].y += self.dy; 
+      }
+    }
+
+    this.update = function() {
+      self.move();
+    }
+
+    this.draw = function(processing){      
+      self.update();
+      processing.stroke("#FFFFFF");
+      for (var j = 0, k = self.edges.length - 1; j < self.edges.length; j++) {
+        processing.line(self.edges[j].x, self.edges[j].y, self.edges[k].x, self.edges[k].y);
+        k = j;
+      }
+    }
+    
+    this.hitTest = function(point) {
+      var hit = false;
+      var polyArr = self.edges;
+      for (var i = 0, j = polyArr.length - 1; i < polyArr.length; i++) {
+        if ((((polyArr[i].y <= point.y) && (point.y < polyArr[j].y)) || ((polyArr[j].y <= point.y) && (point.y < polyArr[i].y))) && (point.x < (polyArr[j].x - polyArr[i].x) * (point.y - polyArr[i].y) / (polyArr[j].y - polyArr[i].y) + polyArr[i].x))
+            hit = !hit;     
+        j = i;
+      }
+      return hit;
+    }
+
   }
 
   var Bullet = function(x, y, callback) {
@@ -428,12 +512,23 @@
     setTimeout(self.notifyHandlers, self.dt);
   }
 
-  function init() {
 
+  var generateAst = function(processing, amount, minR, maxR) {
+    var MAXVELOCITY = 1;
+    asteroids = new Array();
+    var edges = 7; // later will change them... or not :)
+
+    for (var i = 0; i < amount; i++) {
+      asteroids[i] = new Asteroid(
+        Math.random() * pageSizeW, Math.random() * pageSizeH,
+        minR, maxR, edges,
+        MAXVELOCITY - Math.random() * MAXVELOCITY * 2,
+        MAXVELOCITY - Math.random() * MAXVELOCITY * 2);
+    }
   }
 
-  function sketchProc(processing) {   
-    processing.setup = function() {
+  function sketchProc(processing) {
+    processing.setup = function(){
       pageSizeW = window.innerWidth - 1;
       pageSizeH = window.innerHeight - 1;
       canvas.style.position = "absolute";
@@ -447,12 +542,17 @@
 
       sky = new StarsSky(processing, pageSizeW, pageSizeH);
       ship = new Ship(100, 100);
+      generateAst(processing, 15, 5, 40);
 
     };
-    processing.draw = function() {      
+
+    processing.draw = function(){
       processing.background(0);
       sky.update(processing);
       ship.draw(processing);
+      for (var i = 0; i < asteroids.length; i++){
+        asteroids[i].draw(processing);
+      }
     }
   }
   var canvas = document.getElementById("holder");
@@ -462,7 +562,7 @@
 
 // attaching the sketchProc function to the canvas
   var p = new Processing(canvas, sketchProc);
-  
+
   </script>
 
   </body>
