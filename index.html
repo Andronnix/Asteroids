@@ -135,20 +135,25 @@
 
   }
   
-  var Asteroid = function(x, y, minR, maxR, edges, dx, dy) {
+  var Asteroid = function(x, y, size, edgesNum, dx, dy) {
+    var minR = 5;
+    var maxR = 20;
+
     this.edges = new Array(); //Point() array
+    this.edgesNum = edgesNum;
     this.x = x;
     this.y = y;
+    this.size = size;
     this.dx = dx;
     this.dy = dy;
     var self = this;
 
-    var delta = maxR - minR;
-    var angleStep = Math.PI * 2 / edges;
+    var delta = (maxR - minR) * self.size;
+    var angleStep = Math.PI * 2 / edgesNum;
     var angle = 0;
 
-    for (var i = 0; i < edges; i++) {
-      var bone = minR + Math.random() * delta;
+    for (var i = 0; i < self.edgesNum; i++) {
+      var bone = minR * self.size + Math.random() * delta;
       var tx = this.x + bone * Math.cos(angle);
       var ty = this.y + bone * Math.sin(angle);
       this.edges[i] = new Point(tx, ty);
@@ -167,6 +172,9 @@
     }
     
     this.move = function() {
+      var x = self.x;
+      self.x += self.dx;
+      self.y += self.dy;
       for (var j = 0; j < self.edges.length; j++) {
         self.edges[j].x += self.dx;
         self.edges[j].y += self.dy; 
@@ -175,6 +183,21 @@
 
     this.update = function() {
       self.move();
+    }
+
+    this.destroy = function(index) {
+      if(--self.size > 0) {
+        var a = Math.random() * Math.PI * 2;
+        var d = Math.sqrt(self.dx * self.dx + self.dy * self.dy);
+        console.log(self.x0, self.x);
+
+        var b1 = new Asteroid(self.x, self.y, self.size, self.edgesNum, d * Math.cos(a), d * Math.sin(a));
+        var b2 = new Asteroid(self.x, self.y, self.size, self.edgesNum, d * Math.cos(a + Math.PI), d * Math.cos(a + Math.PI));
+
+        asteroids.push(b1);
+        asteroids.push(b2);
+      }
+      asteroids.splice(index, 1);
     }
 
     this.draw = function(processing){      
@@ -189,11 +212,11 @@
       processing.fill("#FFFFFF");
     }
     
-    this.hitTest = function(point) {
+    this.hitTest = function(x, y) {
       var hit = false;
       var polyArr = self.edges;
       for (var i = 0, j = polyArr.length - 1; i < polyArr.length; i++) {
-        if ((((polyArr[i].y <= point.y) && (point.y < polyArr[j].y)) || ((polyArr[j].y <= point.y) && (point.y < polyArr[i].y))) && (point.x < (polyArr[j].x - polyArr[i].x) * (point.y - polyArr[i].y) / (polyArr[j].y - polyArr[i].y) + polyArr[i].x))
+        if ((((polyArr[i].y <= y) && (y < polyArr[j].y)) || ((polyArr[j].y <= y) && (y < polyArr[i].y))) && (x < (polyArr[j].x - polyArr[i].x) * (y - polyArr[i].y) / (polyArr[j].y - polyArr[i].y) + polyArr[i].x))
             hit = !hit;     
         j = i;
       }
@@ -213,15 +236,33 @@
 
     var self = this;
 
+    this.checkHitAsteroids = function() {
+      for(var i = 0; i < asteroids.length; i++) {
+        if(asteroids[i].hitTest(self.x, self.y))
+          return i;
+      }
+      return null;
+    }
+
+    this.destroy = function() {
+        timer.removeHandler(self.MOVEhandler, 0);
+        self.callback(self);           
+    }
+
     this.MOVEhandler = function(delta){
       self.x += self.speed[0];
-      self.y += self.speed[1];    
+      self.y += self.speed[1];
 
       self.lifeTime -= delta;
 
       if(self.lifeTime < 0) { /*SMTH strange with that! */
-        timer.removeHandler(self.MOVEhandler, 0);
-        self.callback(self);        
+        self.destroy();
+      }
+
+      var ast = self.checkHitAsteroids();
+      if(ast != null) {
+        asteroids[ast].destroy(ast);
+        self.destroy();
       }
     }
 
@@ -520,11 +561,12 @@
     var MAXVELOCITY = 1;
     asteroids = new Array();
     var edges = 7; // later will change them... or not :)
+    var maxSize = 4;
 
     for (var i = 0; i < amount; i++) {
       asteroids[i] = new Asteroid(
         Math.random() * pageSizeW, Math.random() * pageSizeH,
-        minR, maxR, edges,
+        maxSize, edges,
         MAXVELOCITY - Math.random() * MAXVELOCITY * 2,
         MAXVELOCITY - Math.random() * MAXVELOCITY * 2);
     }
@@ -546,8 +588,6 @@
       sky = new StarsSky(processing, pageSizeW, pageSizeH);
       ship = new Ship(100, 100);
       generateAst(processing, 15, 5, 40);
-
-
     };
 
     processing.draw = function(){
