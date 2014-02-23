@@ -143,9 +143,9 @@
       this.y = y;
       this.dx = dx;
       this.dy = dy;
-      this.delta = maxR - minR;
-      this.angleStep = Math.PI * 2 / edges;
-      this.angle = 0;
+      var delta = maxR - minR;
+      var angleStep = Math.PI * 2 / edges;
+      var angle = 0;
       for (var i = 0; i < edges; i++) {
         var bone = minR + Math.random() * this.delta;
         var tx = this.x + bone * Math.cos(this.angle);
@@ -153,7 +153,18 @@
         this.edges[i] = new point(tx, ty);
         this.angle += this.angleStep;
       }
-
+      
+      // this will move Asteroid to the specified point with the same acceleration 
+      this.relocate = function(newX, newY) {
+        var oldDx = this.dx;
+        var oldDy = this.dy;
+        this.dx = newX - this.x;
+        this.dy = newy - this.y;
+        this.move();
+        this.dx = oldDx;
+        this.dy = oldDy;        
+      }
+      
       this.move = function() {
         for (var j = 0; j < this.edges.length; j++) {
           this.edges[j].x += this.dx;
@@ -167,12 +178,12 @@
               this.dy *= -1;
             }
           }*/
-          for (var k = 0; k < asteroids.length; k++){
+          /**/for (var k = 0; k < asteroids.length; k++){
             if (this.x != asteroids[k].x && this.y != asteroids[k].y && this.edges[j].isInsidePoly(asteroids[k].edges)) {
               this.dx *= -1;
               this.dy *= -1;
             }
-          }          
+          }//*/          
         }
       }
 
@@ -184,7 +195,9 @@
           k = j;
         }
       }
-      
+      this.clone = function() {
+        var cl = new Asteroid(this.x, this.y);
+      }
     }
     for (var i = 0; i < amount; i++) {
       asteroids[i] = new Asteroid(
