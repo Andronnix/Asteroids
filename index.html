@@ -155,7 +155,9 @@
       
       // this will move Asteroid to the specified point with the same acceleration 
       this.relocate = function(newX, newY) {
-        var oldSpeed = this.speed;
+        var oldSpeed = new Array();
+        oldSpeed[0] = this.speed[0];
+        oldSpeed[1] = this.speed[1];
         this.speed[0] = newX - this.x;
         this.speed[1] = newY - this.y;
         this.move(true);
@@ -188,15 +190,15 @@
           else
             ranAway = false;
           //hittest
-          for (var k = 0; k < asteroids.length; k++){
+          /*for (var k = 0; k < asteroids.length; k++){
             if (this.x != asteroids[k].x && this.y != asteroids[k].y && this.edges[j].isInsidePoly(asteroids[k].edges)) {
-              this.dx *= -1;
-              this.dy *= -1;
-            }
+              this.speed[0] *= -1;
+              this.speed[1] *= -1;
+            }*/
           }
         }
         if (ranAway && !skip) {
-          this.relocate(Math.abs(pageSizeW - Math.abs(this.x)), Math.abs(pageSizeH - Math.abs(this.y)));
+          this.relocate((pageSizeW + this.x) % pageSizeW, (pageSizeH + this.y) % pageSizeH);
         } else
           if (ranPartly) return false;
         return true;
@@ -249,7 +251,7 @@
       processing.stroke("#FFFFFF");
 
       sky = new StarsSky(processing, pageSizeW, pageSizeH);
-      GenerateAst(processing, 1, 20, 40);
+      GenerateAst(processing, 5, 20, 40);
     };
     processing.draw = function(){
       processing.background(0);
