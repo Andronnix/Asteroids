@@ -152,14 +152,22 @@
     var angleStep = Math.PI * 2 / edgesNum;
     var angle = 0;
 
+    var minX = Number.MAX_VALUE, maxX = Number.MIN_VALUE,
+            minY = Number.MAX_VALUE, maxY = Number.MIN_VALUE;
+    // this cycle fills edges array and builds rectangle
     for (var i = 0; i < self.edgesNum; i++) {
       var bone = minR * self.size + Math.random() * delta;
       var tx = this.x + bone * Math.cos(angle);
       var ty = this.y + bone * Math.sin(angle);
       this.edges[i] = new Point(tx, ty);
+      if (tx < minX) minX = tx;
+      if (tx > maxX) maxX = tx;
+      if (ty < minY) minY = ty;
+      if (ty > maxY) maxY = ty;
       angle += angleStep;
     }
-    
+    this.rectPoints = [minX, minY, maxX, maxY];
+
     // this will move Asteroid to the specified Point with the same acceleration 
     this.relocate = function(newX, newY) {
       var oldDx = this.dx;
@@ -175,6 +183,10 @@
       var x = self.x;
       self.x += self.dx;
       self.y += self.dy;
+      self.rectPoints[0] += self.dx;
+      self.rectPoints[1] += self.dy;
+      self.rectPoints[2] += self.dx;
+      self.rectPoints[3] += self.dy;
       for (var j = 0; j < self.edges.length; j++) {
         self.edges[j].x += self.dx;
         self.edges[j].y += self.dy; 
@@ -203,6 +215,8 @@
     this.draw = function(processing){      
       self.update();
       processing.noFill();
+      // for test
+      //processing.rect(this.rectPoints[0], this.rectPoints[1], this.rectPoints[2] - this.rectPoints[0], this.rectPoints[3] - this.rectPoints[1]);
       processing.beginShape();
       for (var j = 0; j < self.edges.length; j++) {
         processing.vertex(self.edges[j].x, self.edges[j].y);
@@ -216,8 +230,9 @@
       var hit = false;
       var polyArr = self.edges;
       for (var i = 0, j = polyArr.length - 1; i < polyArr.length; i++) {
-        if ((((polyArr[i].y <= y) && (y < polyArr[j].y)) || ((polyArr[j].y <= y) && (y < polyArr[i].y))) && (x < (polyArr[j].x - polyArr[i].x) * (y - polyArr[i].y) / (polyArr[j].y - polyArr[i].y) + polyArr[i].x))
-            hit = !hit;     
+        if (x >= this.rectPoints[0] && x <= this.rectPoints[2] && y >= this.rectPoints[1] && y <= this.rectPoints[3])
+          if ((((polyArr[i].y <= y) && (y < polyArr[j].y)) || ((polyArr[j].y <= y) && (y < polyArr[i].y))) && (x < (polyArr[j].x - polyArr[i].x) * (y - polyArr[i].y) / (polyArr[j].y - polyArr[i].y) + polyArr[i].x))
+              hit = !hit;
         j = i;
       }
       return hit;
