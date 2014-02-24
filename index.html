@@ -54,7 +54,8 @@
   var pageSizeH = 550;
   var pageSizeW = 1200;
 
-  function d2h(a) {return a.toString(16);}
+  function dec2hex(a) {return a.toString(16);}
+  function polar2cartesian(r, phi) {return [r * Math.cos(phi), r * Math.sin(phi)];}
 
   var Point = function(x, y) {
     this.x = x;
@@ -369,22 +370,41 @@
   }
 
   var Ship = function(x, y) {
+    var self = this;
     this.x = x;
     this.y = y;
     this.speed = [0, 0];
     this.maxSpeed = 10;
     this.acceleration = 0.3;
     this.rotation = 0;
-    this.rotationSpeed = Math.PI / 36;
+    this.rotationSpeed = Math.PI / 18;
     this.bullets = [];
     this.gunDelay = 250; // 0.25 seconds
     this.gunCurrentDelay = 0;
 
 
     /* polar coordinate system, radius from center and angle anticlockwise [r, alpha] */
-    this.shape = [ [15, Math.PI / 2], [15, 7/6 * Math.PI], [0, 3/2 * Math.PI], [15, 11/6 * Math.PI] ];
     this.center = [0, 0];
-    var self = this;
+    this.shape = [ [15, Math.PI / 2], [15, 7/6 * Math.PI], [0, 3/2 * Math.PI], [15, 11/6 * Math.PI] ];
+
+    this.calcBoundingRect = function() {
+      var min = [15, 15];
+      var max = [-15, -15];
+      var p = [];
+      var r = self.rotation;
+      for(var i = 0; i < self.shape.length; i++) {
+        p = polar2cartesian(self.shape[i][0], self.shape[i][1] + r - Math.PI / 2);
+        if(p[0] < min[0]) min[0] = p[0];
+        if(p[1] < min[1]) min[1] = p[1];
+        if(p[0] > max[0]) max[0] = p[0];
+        if(p[1] > max[1]) max[1] = p[1];
+      }
+      return [min[0] + self.x, min[1] + self.y, max[0] + self.x, max[1] + self.y];
+    }
+
+    // cartesian
+    this.boundingRect = self.calcBoundingRect();
+
 
     function normalizeSpeed(s, maxVal) {
       var s2 = Math.pow(s[0], 2) + Math.pow(s[1], 2);
@@ -407,8 +427,8 @@
 
       self.speed = normalizeSpeed(self.speed, self.maxSpeed);
     };
-    this.LEFThandler = function() { self.rotation -= self.rotationSpeed;};
-    this.RIGHThandler = function() { self.rotation += self.rotationSpeed;};
+    this.LEFThandler = function() { self.rotate(-self.rotationSpeed);};
+    this.RIGHThandler = function() { self.rotate(self.rotationSpeed);};
 
 
     this.fire = function() {
@@ -443,13 +463,69 @@
       self.fire();
     };
 
-    this.MOVEhandler = function(){ 
-      self.x += self.speed[0]; 
-      self.y += self.speed[1];
+    /* 
+     * returns array of three values [sx, sy, out]
+     * sx = -1 if this is crossing LEFT border
+     * sx = 0  if this not crossing any border
+     * sx = 1  if this is crossing RIGHT border
+     *
+     * sy = -1 if this is crossing TOP border
+     * sy = 0  if this not crossing any border
+     * sy = 1  if this is crossing BOTTOM border
+     *
+     * out = false if this intersects page
+     * out = true if this has no intersections with page
+    */
+    this.checkBorder = function() {
+      var sx = 0, sy = 0, outX = 0, outY = 0;
+
+      if (self.boundingRect[0] < 0) {outX++; sx = -1;}         // minX
+      if (self.boundingRect[0] >= pageSizeW) {outX++; sx = 1;}  // minX
+
+      if (self.boundingRect[2] >= pageSizeW) {outX++; sx = 1;} // maxX
+      if (self.boundingRect[2] < 0) {outX++; sx = -1;}         // maxX
+
+      if (self.boundingRect[1] < 0) {outY++; sy = -1;}         // minY
+      if (self.boundingRect[1] >= pageSizeH) {outY++; sy = 1;}  // minY
+
+      if (self.boundingRect[3] >= pageSizeH) {outY++; sy = 1;} // maxY
+      if (self.boundingRect[3] < 0) {outY++; sy = -1;}         // maxY
+
+      return [sx, sy, outX == 2 || outY == 2];
     }
 
-    function polar2cartesian(r, phi) {
-      return [r * Math.cos(phi), r * Math.sin(phi)];
+    this.relocate = function(newX, newY) {
+      var dx = newX - self.x; 
+      var dy = newY - self.y;
+      self.x += dx;
+      self.y += dy;
+      self.boundingRect[0] += dx;
+      self.boundingRect[2] += dx;
+      self.boundingRect[1] += dy;
+      self.boundingRect[3] += dy;
+    }
+
+    this.move = function() {
+      self.x += self.speed[0]; 
+      self.y += self.speed[1];
+      self.boundingRect[0] += self.speed[0];
+      self.boundingRect[2] += self.speed[0];
+      self.boundingRect[1] += self.speed[1];
+      self.boundingRect[3] += self.speed[1];
+    }
+
+    this.rotate = function(angle) {
+      self.rotation += angle;
+      self.boundingRect = self.calcBoundingRect();
+    }
+
+    this.MOVEhandler = function(){
+      self.move();
+
+      var out = self.checkBorder();
+      if(out[2]) {
+        self.relocate((self.x + pageSizeW) % pageSizeW, (self.y + pageSizeH) % pageSizeH);
+      }
     }
 
     this.draw = function(processing) {
@@ -466,6 +542,15 @@
                       p3[0] + self.x, p3[1] + self.y,
                       p4[0] + self.x, p4[1] + self.y
       );
+      /* boundingRect*/
+      /*
+      processing.line(self.boundingRect[0], self.boundingRect[1], self.boundingRect[0], self.boundingRect[3]);
+      processing.line(self.boundingRect[0], self.boundingRect[3], self.boundingRect[2], self.boundingRect[3]);
+      processing.line(self.boundingRect[2], self.boundingRect[3], self.boundingRect[2], self.boundingRect[1]);
+      processing.line(self.boundingRect[2], self.boundingRect[1], self.boundingRect[0], self.boundingRect[1]);
+      */
+
+
       for(var i = 0; i < self.bullets.length; i++)
         self.bullets[i].draw(processing);
     }
