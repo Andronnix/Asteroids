@@ -194,8 +194,8 @@
             if (this.x != asteroids[k].x && this.y != asteroids[k].y && this.edges[j].isInsidePoly(asteroids[k].edges)) {
               this.speed[0] *= -1;
               this.speed[1] *= -1;
-            }*/
-          }
+            }
+          }*/
         }
         if (ranAway && !skip) {
           this.relocate((pageSizeW + this.x) % pageSizeW, (pageSizeH + this.y) % pageSizeH);
@@ -214,17 +214,6 @@
         } else
           this.drawWithCopies();
       }
-      /*this.clone = function() {
-        var cl = new Asteroid(this.x, this.y);
-      }*/
-
-    for (var i = 0; i < amount; i++) {
-      asteroids[i] = new Asteroid(
-        Math.random() * pageSizeW, Math.random() * pageSizeH,
-        minR, maxR, this.edges,
-        MAXVELOCITY - Math.random() * MAXVELOCITY * 2,
-        MAXVELOCITY - Math.random() * MAXVELOCITY * 2);
-    }
     
     /*var absAsteroid = function() {
       this.x = null;
@@ -235,6 +224,13 @@
       this.move = null;
       this.relocate = null;
       }*/
+    }
+    for (var i = 0; i < amount; i++) {
+      asteroids[i] = new Asteroid(
+              Math.random() * pageSizeW, Math.random() * pageSizeH,
+              minR, maxR, this.edges,
+              MAXVELOCITY - Math.random() * MAXVELOCITY * 2,
+              MAXVELOCITY - Math.random() * MAXVELOCITY * 2);
     }
   }
 
