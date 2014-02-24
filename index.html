@@ -306,9 +306,9 @@
     this.hitTest = function(x, y) {
       var out = self.checkBorder();      
       return self.hitTestCopy(x, y, 0, 0) || 
-             self.hitTestCopy(x, y, out[0] * pageSizeW, 0) || 
-             self.hitTestCopy(x, y, 0, out[1] * pageSizeH) ||
-             self.hitTestCopy(x, y, out[0] * pageSizeW, out[1] * pageSizeH);
+             self.hitTestCopy(x, y, -out[0] * pageSizeW, 0) || 
+             self.hitTestCopy(x, y, 0, -out[1] * pageSizeH) ||
+             self.hitTestCopy(x, y, -out[0] * pageSizeW, -out[1] * pageSizeH);
     }
 
   }
@@ -318,7 +318,7 @@
     this.y = y;
     this.R = 3;
     this.speed = [0, 0];
-    this.lifeTime = 1000;
+    this.lifeTime = 5000; // 5 seconds
     this.prevTime = 0;
     this.callback = callback;
 
@@ -341,6 +341,9 @@
       self.x += self.speed[0];
       self.y += self.speed[1];
 
+      if(self.x < 0 || self.x > pageSizeW) self.x = (self.x + pageSizeW) % pageSizeW;
+      if(self.y < 0 || self.y > pageSizeH) self.y = (self.y + pageSizeH) % pageSizeH;
+
       self.lifeTime -= delta;
 
       if(self.lifeTime < 0) { /*SMTH strange with that! */
@@ -354,9 +357,8 @@
       }
     }
 
-    this.launch = function(speed, lifeTime){
-      self.speed = speed;
-      self.lifeTime = lifeTime;      
+    this.launch = function(speed){
+      self.speed = speed;     
       self.prevTime = Date.now();
       timer.addHandler(self.MOVEhandler);
     }
@@ -430,8 +432,7 @@
         var speed = 10;
 
         self.bullets.push(b);
-        var lifeTime = 5000; // 5 seconds
-        b.launch([speed * Math.cos(self.rotation), speed * Math.sin(self.rotation)], lifeTime);
+        b.launch([speed * Math.cos(self.rotation), speed * Math.sin(self.rotation)]);
         
         self.gunCurrentDelay = self.gunDelay;
         h = timer.addHandler(resetGun);
