@@ -63,17 +63,17 @@
       if (this.x < minX || this.x > maxX || this.y < minY || this.y > maxY) return false;
       return true;
     }
-    
+
     this.isInsidePoly = function(polyArr) {
       var hit = false;
       for (var i = 0, j = polyArr.length - 1; i < polyArr.length; i++) {
         if ((((polyArr[i].y <= this.y) && (this.y < polyArr[j].y)) || ((polyArr[j].y <= this.y) && (this.y < polyArr[i].y))) && (this.x < (polyArr[j].x - polyArr[i].x) * (this.y - polyArr[i].y) / (polyArr[j].y - polyArr[i].y) + polyArr[i].x))
-            hit = !hit;     
+            hit = !hit;
         j = i;
       }
       return hit;
     }
-  }  
+  }
 
   var StarsSky = function(processing, width, height) {
     this.N = 100;
@@ -144,8 +144,7 @@
     this.x = x;
     this.y = y;
     this.size = size;
-    this.dx = dx;
-    this.dy = dy;
+    this.speed = [dx, dy];
     var self = this;
 
     var delta = (maxR - minR) * self.size;
@@ -168,40 +167,82 @@
     }
     this.rectPoints = [minX, minY, maxX, maxY];
 
-    // this will move Asteroid to the specified Point with the same acceleration 
+      // this will move Asteroid to the specified point with the same acceleration 
     this.relocate = function(newX, newY) {
-      var oldDx = this.dx;
-      var oldDy = this.dy;
-      this.dx = newX - this.x;
-      this.dy = newy - this.y;
-      this.move();
-      this.dx = oldDx;
-      this.dy = oldDy;        
-    }
-    
-    this.move = function() {
-      var x = self.x;
-      self.x += self.dx;
-      self.y += self.dy;
-      self.rectPoints[0] += self.dx;
-      self.rectPoints[1] += self.dy;
-      self.rectPoints[2] += self.dx;
-      self.rectPoints[3] += self.dy;
+      var dx = newX - self.x;
+      var dy = newY - self.y;
+      self.x += dx;
+      self.y += dy;
+
       for (var j = 0; j < self.edges.length; j++) {
-        self.edges[j].x += self.dx;
-        self.edges[j].y += self.dy; 
+        self.edges[j].x += dx;
+        self.edges[j].y += dy;
+      }
+
+      self.rectPoints[0] += dx;
+      self.rectPoints[2] += dx;
+      self.rectPoints[1] += dy;
+      self.rectPoints[3] += dy;
+    }
+
+    this.drawCopy = function(processing, sx, sy) {
+      processing.stroke("#FFFFFF");
+      for (var j = 0, k = self.edges.length - 1; j < self.edges.length; j++) {
+        processing.line(self.edges[j].x + sx, self.edges[j].y + sy, self.edges[k].x + sx, self.edges[k].y + sy);
+        k = j;
       }
     }
 
-    this.update = function() {
-      self.move();
+    /* 
+     * returns array of three values [sx, sy, out]
+     * sx = -1 if this is crossing LEFT border
+     * sx = 0  if this not crossing any border
+     * sx = 1  if this is crossing RIGHT border
+     *
+     * sy = -1 if this is crossing TOP border
+     * sy = 0  if this not crossing any border
+     * sy = 1  if this is crossing BOTTOM border
+     *
+     * out = false if this intersects page
+     * out = true if this has no intersections with page
+    */
+    this.checkBorder = function() {
+      var sx = 0, sy = 0, outX = 0, outY = 0;
+
+      if (self.rectPoints[0] < 0) {outX++; sx = -1;}         // minX
+      if (self.rectPoints[0] >=pageSizeW) {outX++; sx = 1;}  // minX
+
+      if (self.rectPoints[2] >= pageSizeW) {outX++; sx = 1;} // maxX
+      if (self.rectPoints[2] < 0) {outX++; sx = -1;}         // maxX
+
+      if (self.rectPoints[1] < 0) {outY++; sy = -1;}         // minY
+      if (self.rectPoints[1] >=pageSizeH) {outY++; sy = 1;}  // minY
+
+      if (self.rectPoints[3] >= pageSizeH) {outY++; sy = 1;} // maxY
+      if (self.rectPoints[3] < 0) {outY++; sy = -1;}         // maxY
+
+      return [sx, sy, outX == 2 || outY == 2];
+    }
+
+    this.move = function() {
+      self.x += self.speed[0];
+      self.y += self.speed[1];
+      for (var j = 0; j < self.edges.length; j++) {
+        self.edges[j].x += self.speed[0];
+        self.edges[j].y += self.speed[1];
+      }      
+      self.rectPoints[0] += self.speed[0]; //minX
+      self.rectPoints[2] += self.speed[0]; //maxX
+
+      self.rectPoints[1] += self.speed[1]; //minY
+      self.rectPoints[3] += self.speed[1]; //maxY
     }
 
     this.destroy = function(index) {
       if(--self.size > 0) {
         var a = Math.random() * Math.PI * 2;
-        var d = Math.sqrt(self.dx * self.dx + self.dy * self.dy);
-        console.log(self.x0, self.x);
+        var d = Math.sqrt(self.speed[0] * self.speed[0] + self.speed[1] * self.speed[1]);
+
 
         var b1 = new Asteroid(self.x, self.y, self.size, self.edgesNum, d * Math.cos(a), d * Math.sin(a));
         var b2 = new Asteroid(self.x, self.y, self.size, self.edgesNum, d * Math.cos(a + Math.PI), d * Math.cos(a + Math.PI));
@@ -212,30 +253,62 @@
       asteroids.splice(index, 1);
     }
 
-    this.draw = function(processing){      
+    this.draw = function(processing) {
       self.update();
-      processing.noFill();
-      // for test
-      //processing.rect(this.rectPoints[0], this.rectPoints[1], this.rectPoints[2] - this.rectPoints[0], this.rectPoints[3] - this.rectPoints[1]);
-      processing.beginShape();
-      for (var j = 0; j < self.edges.length; j++) {
-        processing.vertex(self.edges[j].x, self.edges[j].y);
+
+      var out = self.checkBorder();
+      self.drawCopy(processing, 0, 0);
+      if(out[0] != 0) {
+        self.drawCopy(processing, -out[0] * pageSizeW, 0);
       }
-      processing.vertex(self.edges[0].x, self.edges[0].y);
-      processing.endShape();
-      processing.fill("#FFFFFF");
+      if(out[1] != 0) {
+        self.drawCopy(processing, 0, -out[1] * pageSizeH);
+      }
+      if(out[0] * out[1] != 0) {
+        self.drawCopy(processing, -out[0] * pageSizeW, -out[1] * pageSizeH);
+      }
+
+      /* boundingRect*/
+      /*
+      processing.line(self.rectPoints[0], self.rectPoints[1], self.rectPoints[0], self.rectPoints[3]);
+      processing.line(self.rectPoints[0], self.rectPoints[3], self.rectPoints[2], self.rectPoints[3]);
+      processing.line(self.rectPoints[2], self.rectPoints[3], self.rectPoints[2], self.rectPoints[1]);
+      processing.line(self.rectPoints[2], self.rectPoints[1], self.rectPoints[0], self.rectPoints[1]);
+      */
     }
-    
-    this.hitTest = function(x, y) {
+
+    this.update = function() {        
+      self.move();
+
+      var out = self.checkBorder();
+      if(out[2]) {
+        self.relocate((pageSizeW + self.x) % pageSizeW, (pageSizeH + self.y) % pageSizeH);
+      }
+    }    
+
+    this.hitTestCopy = function(x, y, dx, dy) {
       var hit = false;
       var polyArr = self.edges;
-      for (var i = 0, j = polyArr.length - 1; i < polyArr.length; i++) {
-        if (x >= this.rectPoints[0] && x <= this.rectPoints[2] && y >= this.rectPoints[1] && y <= this.rectPoints[3])
-          if ((((polyArr[i].y <= y) && (y < polyArr[j].y)) || ((polyArr[j].y <= y) && (y < polyArr[i].y))) && (x < (polyArr[j].x - polyArr[i].x) * (y - polyArr[i].y) / (polyArr[j].y - polyArr[i].y) + polyArr[i].x))
+
+      if (x >= dx + self.rectPoints[0] && x <= dx + self.rectPoints[2] && y >= dy + self.rectPoints[1] && y <= dy + self.rectPoints[3]) {
+        for (var i = 0, j = polyArr.length - 1; i < polyArr.length; i++) {        
+          if ((((polyArr[i].y + dy <= y) && (y < dy + polyArr[j].y)) || ((polyArr[j].y <= y) && (y < polyArr[i].y)))
+           && (x < (polyArr[j].x - polyArr[i].x) * (y - polyArr[i].y - dy) / (polyArr[j].y - polyArr[i].y) + polyArr[i].x + dx)) {
               hit = !hit;
-        j = i;
-      }
+            }
+
+          j = i;
+        }
+      }      
       return hit;
+    }
+
+    this.hitTest = function(x, y) {
+      var out = self.checkBorder();      
+      return self.hitTestCopy(x, y, 0, 0) || 
+             self.hitTestCopy(x, y, out[0] * pageSizeW, 0) || 
+             self.hitTestCopy(x, y, 0, out[1] * pageSizeH) ||
+             self.hitTestCopy(x, y, out[0] * pageSizeW, out[1] * pageSizeH);
     }
 
   }
@@ -320,19 +393,19 @@
       return s;
     }
 
-    this.UPhandler    = function() {
+    this.UPhandler = function() {
       self.speed[0] += self.acceleration * Math.cos(self.rotation);
       self.speed[1] += self.acceleration * Math.sin(self.rotation);
 
       self.speed = normalizeSpeed(self.speed, self.maxSpeed);
     };
-    this.DOWNhandler  = function() { 
+    this.DOWNhandler = function() { 
       self.speed[0] -= self.acceleration * Math.cos(self.rotation);
       self.speed[1] -= self.acceleration * Math.sin(self.rotation);
 
       self.speed = normalizeSpeed(self.speed, self.maxSpeed);
     };
-    this.LEFThandler  = function() { self.rotation -= self.rotationSpeed;};
+    this.LEFThandler = function() { self.rotation -= self.rotationSpeed;};
     this.RIGHThandler = function() { self.rotation += self.rotationSpeed;};
 
 
@@ -601,8 +674,9 @@
       processing.stroke("#FFFFFF");      
 
       sky = new StarsSky(processing, pageSizeW, pageSizeH);
+
       ship = new Ship(100, 100);
-      generateAst(processing, 15, 5, 40);
+      generateAst(processing, 10, 5, 40);
     };
 
     processing.draw = function(){
