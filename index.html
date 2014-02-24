@@ -142,6 +142,8 @@
       this.x = x;
       this.y = y;
       this.speed = [dx, dy];
+      var self = this;
+
       var delta = maxR - minR;
       var angleStep = Math.PI * 2 / edges;
       var angle = 0;
@@ -155,64 +157,75 @@
       
       // this will move Asteroid to the specified point with the same acceleration 
       this.relocate = function(newX, newY) {
-        var oldSpeed = new Array();
-        oldSpeed[0] = this.speed[0];
-        oldSpeed[1] = this.speed[1];
-        this.speed[0] = newX - this.x;
-        this.speed[1] = newY - this.y;
-        this.move(true);
-        this.speed = oldSpeed;
-        }
+        var dx = newX - self.x;
+        var dy = newY - self.y;
+        self.x += dx;
+        self.y += dy;
 
-      this.drawWithCopies = function() {
-        for (var j = 0, k = this.edges.length - 1; j < this.edges.length; j++) {
-          processing.line(this.edges[j].x, this.edges[j].y, this.edges[k].x, this.edges[k].y);
-          processing.line(this.edges[j].x - pageSizeW, this.edges[j].y, this.edges[k].x - pageSizeW, this.edges[k].y);
-          processing.line(this.edges[j].x, this.edges[j].y - pageSizeH, this.edges[k].x, this.edges[k].y - pageSizeH);
-          processing.line(this.edges[j].x + pageSizeW, this.edges[j].y, this.edges[k].x + pageSizeW, this.edges[k].y);
-          processing.line(this.edges[j].x, this.edges[j].y + pageSizeH, this.edges[k].x, this.edges[k].y + pageSizeH);
+        for (var j = 0; j < self.edges.length; j++) {
+          self.edges[j].x += dx;
+          self.edges[j].y += dy;
+        }
+      }
+
+      this.drawCopy = function(sx, sy) {
+        processing.stroke("#FFFFFF");
+        for (var j = 0, k = self.edges.length - 1; j < self.edges.length; j++) {
+          processing.line(self.edges[j].x + sx, self.edges[j].y + sy, self.edges[k].x + sx, self.edges[k].y + sy);
           k = j;
         }
       }
 
-      this.move = function(skip) {
-        skip = skip || false;
-        var ranAway = true;
-        var ranPartly = false;
+      /* 
+       * returns array of three values [sx, sy, out]
+       * sx = -1 if this is crossing LEFT border
+       * sx = 0  if this not crossing any border
+       * sx = 1  if this is crossing RIGHT border
+       *
+       * sy = -1 if this is crossing TOP border
+       * sy = 0  if this not crossing any border
+       * sy = 1  if this is crossing BOTTOM border
+       *
+       * out = false if this intersects page
+       * out = true if this has no intersections with page
+      */
+      this.checkBorder = function() {
+        var sx = 0, sy = 0, outX = 0, outY = 0;
+        for (var j = 0; j < self.edges.length; j++) {          
+          if (this.edges[j].x < 0) {outX++; sx = -1;}
+          if (this.edges[j].x >= pageSizeW) {outX++; sx = 1;}
+          if (this.edges[j].y < 0) {outY++; sy = -1;}
+          if (this.edges[j].y >= pageSizeH) {outY++; sy = 1;}
+        }
+        return [sx, sy, outX == self.edges.length || outY == self.edges.length];
+      }
+
+      this.move = function() {
         this.x += this.speed[0];
         this.y += this.speed[1];
         for (var j = 0; j < this.edges.length; j++) {
           this.edges[j].x += this.speed[0];
           this.edges[j].y += this.speed[1];
-          if (this.edges[j].x < 0 || this.edges[j].x >= pageSizeW ||
-                  this.edges[j].y < 0 || this.edges[j].y >= pageSizeH)
-            ranPartly = true;
-          else
-            ranAway = false;
-          //hittest
-          /*for (var k = 0; k < asteroids.length; k++){
-            if (this.x != asteroids[k].x && this.y != asteroids[k].y && this.edges[j].isInsidePoly(asteroids[k].edges)) {
-              this.speed[0] *= -1;
-              this.speed[1] *= -1;
-            }
-          }*/
         }
-        if (ranAway && !skip) {
-          this.relocate((pageSizeW + this.x) % pageSizeW, (pageSizeH + this.y) % pageSizeH);
-        } else
-          if (ranPartly) return false;
-        return true;
       }
 
-      this.update = function(processing) {
-        processing.stroke("#FFFFFF");
-        if (this.move()) {
-          for (var j = 0, k = this.edges.length - 1; j < this.edges.length; j++) {
-            processing.line(this.edges[j].x, this.edges[j].y, this.edges[k].x, this.edges[k].y);
-            k = j;
-          }
-        } else
-          this.drawWithCopies();
+      this.draw = function(processing) {
+        var out = self.checkBorder();
+        self.drawCopy(0, 0);
+        if(out[0] * out[0] + out[1] * out[1] > 0) {
+          self.drawCopy(-out[0] * pageSizeW, -out[1] * pageSizeH);
+        }
+      }
+
+      this.update = function(processing) {        
+        this.move();
+
+        var out = self.checkBorder();
+        if(out[2]) {
+          this.relocate((pageSizeW + this.x) % pageSizeW, (pageSizeH + this.y) % pageSizeH);
+        }
+
+        self.draw(processing);
       }
     
     /*var absAsteroid = function() {
@@ -248,7 +261,7 @@
       processing.stroke("#FFFFFF");
 
       sky = new StarsSky(processing, pageSizeW, pageSizeH);
-      GenerateAst(processing, 5, 20, 40);
+      GenerateAst(processing, 10, 20, 40);
     };
     processing.draw = function(){
       processing.background(0);
