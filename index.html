@@ -51,6 +51,8 @@
   <script>
   var background, ship;
   var asteroids;
+  var PLAYER_SCORE = 0;
+  var play = true;
 
   var keyListener, timer;
 
@@ -60,6 +62,10 @@
 
   function dec2hex(a) {return a.toString(16);}
   function polar2cartesian(r, phi) {return [r * Math.cos(phi), r * Math.sin(phi)];}
+  function gameOver() {
+    background.textsWidget.addText(function() { return "Game over!\nYour score: " + PLAYER_SCORE}, pageSizeW / 2 - 200, pageSizeH / 2 - 50, 50);
+    timer.stop();
+  }
 
   var Point = function(x, y) {
     this.x = x;
@@ -86,7 +92,6 @@
     this.processing = processing;
     this.width = width;
     this.height = height;
-    this.livesWidget;
     this.textsWidget = new TextsWidget([]);
     var self = this;
 
@@ -264,6 +269,7 @@
 
         asteroids.push(b1);
         asteroids.push(b2);
+        PLAYER_SCORE++;
       }
     }
 
@@ -386,8 +392,8 @@
     var self = this;
     this.x = x;
     this.y = y;
-    this.invisible = false;
-    this.lives = 3;
+    this.invisible = true;
+    this.lives = 1;
     
     this.speed = [0, 0];
     this.maxSpeed = 10;
@@ -527,6 +533,12 @@
       return false;
     }
 
+    this.setInvisibleHandler = function() {
+      timer.addHandler(function (){ 
+        self.invisible = false;
+      }, 3000, true);      
+    }    
+
     this.relocate = function(newX, newY) {
       var dx = newX - self.x; 
       var dy = newY - self.y;
@@ -548,8 +560,12 @@
 
       var hitTest = self.checkHitAsteroids();
       if(hitTest) {
-        this.invisible = hitTest;
-        this.lives = 0;
+        self.invisible = true;        
+        self.lives--;
+        if(self.lives == 0) {
+          timer.addHandler(gameOver, 100);
+        }
+        self.setInvisibleHandler();
       }
     }
 
@@ -570,7 +586,13 @@
     this.draw = function(processing) {
       var s = this.shape;
       var r = this.rotation - Math.PI / 2;
-      processing.stroke("#CCCCCC");
+      if(!self.invisible) {
+        processing.stroke(255);
+        processing.fill(255);
+      } else {
+        processing.stroke(150);
+        processing.fill(150);
+      }
       var p1 = polar2cartesian(s[0][0], s[0][1] + r);
       var p2 = polar2cartesian(s[1][0], s[1][1] + r);
       var p3 = polar2cartesian(s[2][0], s[2][1] + r);
@@ -613,34 +635,29 @@
       }
     }
 
-    background.livesWidget = new LivesWidget(5, 15, self);
-
-    background.textsWidget.addText("WASD - move, SPACE - fire", 5, pageSizeH - 15, 12);
+    background.textsWidget.addText(
+      function(){ 
+        return "WASD - move, SPACE - fire" 
+      },
+      5, pageSizeH - 15, 12
+    );
+    background.textsWidget.addText(function(){
+        var lives = "";
+        for(var i = 0; i < self.lives; i++) lives += " \u0131";
+          return "Lives:" + lives;
+      }, 25, 0, 25
+    );
+    background.textsWidget.addText(function(){
+        return "Score: " + PLAYER_SCORE; 
+      }, pageSizeW - 150, 0, 25
+    );
 
     keyListener.addKeyDownListener(this.ControlsDown, [32, 37, 38, 39, 40]);
     keyListener.addKeyUpListener(this.ControlsUp, [32, 37, 38, 39, 40]);
+    self.setInvisibleHandler();
+
     timer.addHandler(this.MOVEhandler, 20);
 
-  }
-
-  var LivesWidget = function(x, y, ship) {
-    this.x = x;
-    this.y = y;
-    this.ship = ship;
-    this.fontSize = 25;
-
-    var text;
-    var self = this;    
-
-    this.draw = function(processing){
-            
-      processing.fill(255);
-      processing.textSize(self.fontSize);
-      var lives = "";
-      for(var i = 0; i < self.ship.lives; i++) lives += " \u0131";
-      processing.text("Lifes" + lives, self.x, self.y + self.fontSize);
-
-    }
   }
 
   var TextsWidget = function(texts) {
@@ -651,10 +668,14 @@
       processing.fill(255);
       for(var i = 0; i < self.texts.length; i++) {
         processing.textSize(self.texts[i]["fontsize"]);
-        processing.text(self.texts[i]["text"], self.texts[i]["x"], self.texts[i]["y"] + self.texts[i]["fontsize"]);
+        processing.text(self.texts[i].text(), self.texts[i]["x"], self.texts[i]["y"] + self.texts[i]["fontsize"]);
       }
     }
+    /*
+      text() should return text to display
+    */
     this.addText = function(text, x, y, fontsize) {
+      if(typeof text != "function") return;
       var t = [];
       t["text"] = text;
       t["x"] = x;
@@ -764,48 +785,75 @@
     document.addEventListener("visibilitychange", visibilityChanged);
   }
 
-
-  var Timer = function(dt) {    
+  var Timer = function(dt) {
     this.handlers = [];
     this.dt = dt;
     this.oldTime;
     var self = this;
+    this.isNotifying = false;
+    this.delayedHandlers = [];
 
-    this.addHandler = function(handler, dt, params) {
+    this.addHandler = function(handler, dt, disposable, params) {
       if(handler == undefined) return;
-      dt = dt | (this.dt / 2);
-      params = params | [];
+
+      dt = typeof dt !== 'undefined' ? dt : (this.dt / 2);      
+      disposable = typeof disposable !== 'undefined' ? disposable : false;
+      params = typeof params !== 'undefined' ? params : [];
+
       /* handler function, delta, currentDelta */
-      this.handlers.push([handler, dt, dt, params, false]);
+      this.handlers.push({
+        "handler": handler,
+        "currentTime": dt,
+        "time": dt,
+        "params": params,
+        "disposable": disposable
+      });
       return handler;
     }
 
-    this.removeHandler = function(handler) {      
-      var l;
-      while(true){
-        l = this.handlers.length;
-        for(var i = 0; i < this.handlers.length; i++){
-          if(this.handlers[i][0] == handler){
-            this.handlers.splice(i, 1);
-            i--;
-          }
+    this.delayedRemove = function() {
+      self.delayedHandlers.sort();
+      //Handlers must be removed in reverse order to avoid index chaging
+      var l = self.delayedHandlers.length;
+      while(l-- > 0)
+        self.handlers.splice(self.delayedHandlers[l], 1);
+      self.delayedHandlers = [];
+    }
+
+    this.stop = function() {
+      self.dt = Number.MAX_VALUE; //In fact, it doesn't stop =)
+    }
+
+    this.removeHandler = function(handler) {       
+      var l = self.handlers.length;
+      for(var i = 0; i < self.handlers.length; i++){
+        if(self.handlers[i].handler == handler) {
+          self.delayedHandlers.push(i);
         }
-        if(i == l) break;
+      }
+      if(!self.isNotifying) {
+        self.delayedRemove();
       }
     }
 
     this.notifyHandlers = function(){
+      self.isNotifying = true;
       var t = Date.now();
       var delta = t - self.oldTime;      
       self.oldTime = t;
       var h = self.handlers;      
       for(var i = 0; i < h.length; i++) {
-        h[i][2] -= delta;
-        if(h[i][2] < 0) {
-          h[i][2] = h[i][1]; // reset time;
-          h[i][0].call(window, delta, h[i][3]); // WARNING: this must be last use of h[i] in loop
+        h[i].currentTime -= delta;
+        if(h[i].currentTime < 0) {
+          h[i].currentTime = h[i].time; // reset time;
+          h[i].handler.call(window, delta, h[i].params); 
+          if(h[i].disposable) {
+            self.removeHandler(h[i].handler);
+          }
         }
       }
+      self.isNotifying = false;
+      self.delayedRemove();
       setTimeout(self.notifyHandlers, self.dt);
     }
     this.oldTime = Date.now();
