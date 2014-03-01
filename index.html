@@ -251,6 +251,9 @@
     }
 
     this.destroy = function(index) {
+
+      asteroids.splice(index, 1);
+
       if(--self.size > 0) {
         var a = Math.random() * Math.PI * 2;
         var d = Math.sqrt(self.speed[0] * self.speed[0] + self.speed[1] * self.speed[1]);
@@ -262,7 +265,6 @@
         asteroids.push(b1);
         asteroids.push(b2);
       }
-      asteroids.splice(index, 1);
     }
 
     this.draw = function(processing) {
@@ -384,12 +386,15 @@
     var self = this;
     this.x = x;
     this.y = y;
+    this.invisible = false;
     this.lives = 3;
+    
     this.speed = [0, 0];
     this.maxSpeed = 10;
     this.acceleration = 0.3;
     this.rotation = 0;
     this.rotationSpeed = Math.PI / 18;
+
     this.bullets = [];
     this.gunDelay = 250; // 0.25 seconds
     this.gunCurrentDelay = 0;
@@ -442,6 +447,9 @@
     this.LEFThandler = function() { self.rotate(-self.rotationSpeed);};
     this.RIGHThandler = function() { self.rotate(self.rotationSpeed);};
 
+    this.SPACEhandler = function() {
+      self.fire();
+    };
 
     this.fire = function() {
       var h; 
@@ -471,9 +479,7 @@
       }
     }
 
-    this.SPACEhandler = function() {
-      self.fire();
-    };
+
 
     /* 
      * returns array of three values [sx, sy, out]
@@ -506,6 +512,21 @@
       return [sx, sy, outX == 2 || outY == 2];
     }
 
+    this.checkHitAsteroids = function() {
+      if(self.invisible) return;
+
+      var x = self.x, y = self.y;
+      for(var i = 0; i < asteroids.length; i++) {
+        for(var j = 0; j < self.shape.length; j++) {
+          var t = polar2cartesian(self.shape[j][0], self.shape[j][1]);
+          if(asteroids[i].hitTest(t[0] + x, t[1] + y)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    }
+
     this.relocate = function(newX, newY) {
       var dx = newX - self.x; 
       var dy = newY - self.y;
@@ -524,6 +545,12 @@
       self.boundingRect[2] += self.speed[0];
       self.boundingRect[1] += self.speed[1];
       self.boundingRect[3] += self.speed[1];
+
+      var hitTest = self.checkHitAsteroids();
+      if(hitTest) {
+        this.invisible = hitTest;
+        this.lives = 0;
+      }
     }
 
     this.rotate = function(angle) {
@@ -744,13 +771,12 @@
     this.oldTime;
     var self = this;
 
-
     this.addHandler = function(handler, dt, params) {
       if(handler == undefined) return;
       dt = dt | (this.dt / 2);
       params = params | [];
       /* handler function, delta, currentDelta */
-      this.handlers.push([handler, dt, dt, params]);
+      this.handlers.push([handler, dt, dt, params, false]);
       return handler;
     }
 
