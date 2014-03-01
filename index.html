@@ -3,6 +3,10 @@
   <head>
     <script src="processing.js"></script>  
     <style>
+      @font-face {
+        font-family: Orbitron; /* Имя шрифта */
+        src: url("Orbitron Medium.ttf"); /* Путь к файлу со шрифтом */
+      }
       body{
         background-color:black;
         color:white;
@@ -45,7 +49,7 @@
   <body>
   <canvas id="holder"></canvas>
   <script>
-  var sky, ship;
+  var background, ship;
   var asteroids;
 
   var keyListener, timer;
@@ -76,12 +80,15 @@
     }
   }
 
-  var StarsSky = function(processing, width, height) {
+  var Background = function(processing, width, height) {
     this.N = 100;
     this.stars = new Array();
     this.processing = processing;
     this.width = width;
     this.height = height;
+    this.livesWidget;
+    this.textsWidget = new TextsWidget([]);
+    var self = this;
 
     var Star = function (x, y, blinkPeriod) {
       this.x = x;
@@ -109,12 +116,16 @@
     this.draw = function(processing) {
       var s, R;
 
-      for(var i = 0; i < this.N; i++) {
-        s = this.stars[i];
+      for(var i = 0; i < self.N; i++) {
+        s = self.stars[i];
         R = 3 * Math.sin(s.nextBlink / s.blinkPeriod * Math.PI * 2);
         processing.ellipse(s.x, s.y, R, R);
       }
+      if(self.livesWidget != undefined)
+        self.livesWidget.draw(processing);
 
+      if(self.textsWidget != undefined)
+        self.textsWidget.draw(processing);
     }
 
     this.update = function(processing) {
@@ -373,6 +384,7 @@
     var self = this;
     this.x = x;
     this.y = y;
+    this.lives = 3;
     this.speed = [0, 0];
     this.maxSpeed = 10;
     this.acceleration = 0.3;
@@ -574,10 +586,55 @@
       }
     }
 
+    background.livesWidget = new LivesWidget(5, 15, self);
+
+    background.textsWidget.addText("WASD - move, SPACE - fire", 5, pageSizeH - 15, 12);
+
     keyListener.addKeyDownListener(this.ControlsDown, [32, 37, 38, 39, 40]);
     keyListener.addKeyUpListener(this.ControlsUp, [32, 37, 38, 39, 40]);
     timer.addHandler(this.MOVEhandler, 20);
 
+  }
+
+  var LivesWidget = function(x, y, ship) {
+    this.x = x;
+    this.y = y;
+    this.ship = ship;
+    this.fontSize = 25;
+
+    var text;
+    var self = this;    
+
+    this.draw = function(processing){
+            
+      processing.fill(255);
+      processing.textSize(self.fontSize);
+      var lives = "";
+      for(var i = 0; i < self.ship.lives; i++) lives += " \u0131";
+      processing.text("Lifes" + lives, self.x, self.y + self.fontSize);
+
+    }
+  }
+
+  var TextsWidget = function(texts) {
+    this.texts = texts;
+    var self = this;
+
+    this.draw = function(processing){
+      processing.fill(255);
+      for(var i = 0; i < self.texts.length; i++) {
+        processing.textSize(self.texts[i]["fontsize"]);
+        processing.text(self.texts[i]["text"], self.texts[i]["x"], self.texts[i]["y"] + self.texts[i]["fontsize"]);
+      }
+    }
+    this.addText = function(text, x, y, fontsize) {
+      var t = [];
+      t["text"] = text;
+      t["x"] = x;
+      t["y"] = y;
+      t["fontsize"] = fontsize;
+      self.texts.push(t);
+    }
   }
   
   var KeyListener = function(holder) {
@@ -667,7 +724,6 @@
       if(index >= 0) {
         self.notifyListeners(self.keyUpListeners, c);
         self.keys.splice(index, 1);
-        //console.log(self.keys, c, index);
       }else{
         console.log("WTF?!");
       }
@@ -747,7 +803,9 @@
   }
 
   function sketchProc(processing) {
-    processing.setup = function(){
+    processing.setup = function() {
+      /* @pjs font="Orbitron_Black.ttf"; */
+
       pageSizeW = window.innerWidth - 1;
       pageSizeH = window.innerHeight - 1;
       canvas.style.position = "absolute";
@@ -757,17 +815,22 @@
       processing.frameRate(1000 / dt);
 
       processing.background(0);
-      processing.stroke("#FFFFFF");      
+      processing.stroke("#FFFFFF"); 
 
-      sky = new StarsSky(processing, pageSizeW, pageSizeH);
+      var font = new processing.PFont();
+      font = processing.createFont("Orbitron");
+      processing.textFont(font, 25);   
 
-      ship = new Ship(100, 100);
+
+      background = new Background(processing, pageSizeW, pageSizeH);
+      ship = new Ship(100, 100); 
+
       generateAst(processing, 10, 5, 40);
     };
 
     processing.draw = function(){
       processing.background(0);
-      sky.update(processing);
+      background.update(processing);
       ship.draw(processing);
       for (var i = 0; i < asteroids.length; i++){
         asteroids[i].draw(processing);
