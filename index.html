@@ -404,7 +404,7 @@
 
     this.bullets = [];
     this.gunDelay = 250; // 0.25 seconds
-    this.gunCurrentDelay = 0;
+    this.gunReady = true;
 
 
     /* polar coordinate system, radius from center and angle anticlockwise [r, alpha] */
@@ -459,13 +459,8 @@
     };
 
     this.fire = function() {
-      var h; 
       function resetGun(delta) {
-        self.gunCurrentDelay -= delta;
-        if(self.gunCurrentDelay <= 0) {
-          self.gunCurrentDelay = 0;
-          timer.removeHandler(h);
-        }
+        self.gunReady = true;
       };
 
       function callback(b) {
@@ -474,15 +469,15 @@
           self.bullets.splice(index, 1);
       };
 
-      if(self.gunCurrentDelay == 0) {
+      if(self.gunReady) {
         var b = new Bullet(self.x, self.y, callback); 
         var speed = 10;
 
         self.bullets.push(b);
         b.launch([speed * Math.cos(self.rotation), speed * Math.sin(self.rotation)]);
         
-        self.gunCurrentDelay = self.gunDelay;
-        h = timer.addHandler(resetGun);
+        self.gunReady = false;
+        timer.addHandler(resetGun, self.gunDelay, true);
       }
     }
 
