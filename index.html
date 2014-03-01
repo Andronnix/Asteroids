@@ -821,7 +821,7 @@
     }
 
     this.stop = function() {
-      self.dt = Number.MAX_VALUE; //In fact, it doesn't stop =)
+      self.dt = 1000 * 60 * 60 * 24 * 365;
     }
 
     this.removeHandler = function(handler) {       
